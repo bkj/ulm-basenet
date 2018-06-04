@@ -483,18 +483,18 @@ def basenet_train(model, dataloaders, num_epochs, lr_breaks, lr_vals, adam_betas
     
     fitist = []
     for epoch in range(num_epochs):
-        train = model.train_epoch(dataloaders, mode='train', compute_acc=False)
-        valid = model.eval_epoch(dataloaders, mode='valid', compute_acc=True)
-        fitist.append({
-            "epoch"      : int(epoch),
-            "train_loss" : float(train['loss'][-1]),
-            "valid_acc"  : float(valid['acc']),
-            "valid_loss" : float(valid['loss'][-1]),
-        })
-        print(json.dumps(fitist[-1]))
-        sys.stdout.flush()
+        # train = model.train_epoch(dataloaders, mode='train', compute_acc=False)
+        # valid = model.eval_epoch(dataloaders, mode='valid', compute_acc=True)
+        # fitist.append({
+        #     "epoch"      : int(epoch),
+        #     "train_loss" : float(train['loss'][-1]),
+        #     "valid_acc"  : float(valid['acc']),
+        #     "valid_loss" : float(valid['loss'][-1]),
+        # })
+        # print(json.dumps(fitist[-1]))
+        # sys.stdout.flush()
         
         if save_prefix is not None:
-            torch.save(language_model.state_dict(), '%s-epoch%d.h5' % (save_prefix, epoch))
+            torch.save(model.state_dict(), '%s-epoch%d.h5' % (save_prefix, epoch))
     
     return fitist
