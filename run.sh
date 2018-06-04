@@ -48,7 +48,7 @@ python featurize.py \
     --load-itos $RUN_PATH/itos.pkl
 
 # Finetune LM
-python finetune_lm.py \
+CUDA_VISIBLE_DEVICES=0 python finetune_lm.py \
     --lm-weights-path models/wt103/fwd_wt103.h5 \
     --lm-itos-path models/wt103/itos_wt103.pkl \
     --itos-path $RUN_PATH/itos.pkl \
