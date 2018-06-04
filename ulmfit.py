@@ -331,8 +331,8 @@ class MultiBatchRNN(RNN_Encoder):
         return [torch.cat([l[si] for l in arrs]) for si in range(len(arrs[0]))]
         
     def forward(self, input):
-        sl, bs = input.size()
-        _ = [[h.data.zero_() for h in l] for l in self.hidden]
+        sl, _ = input.size()
+        _ = [[hh.data.zero_() for hh in h] for h in self.hidden]
         
         raw_outputs, outputs = [], []
         for i in range(0, sl, self.bptt):
@@ -358,10 +358,12 @@ class LinearBlock(nn.Module):
 
 class PoolingLinearClassifier(nn.Module):
     # From `fastai`
-    def __init__(self, layers, drops):
+    def __init__(self, layers, drops, predict_only=False):
         super().__init__()
         self.layers = nn.ModuleList([
             LinearBlock(layers[i], layers[i + 1], drops[i]) for i in range(len(layers) - 1)])
+        
+        self.predict_only = predict_only
         
     def pool(self, x, bs, is_max):
         f = F.adaptive_max_pool1d if is_max else F.adaptive_avg_pool1d
@@ -381,7 +383,10 @@ class PoolingLinearClassifier(nn.Module):
             l_x = l(x)
             x = F.relu(l_x)
         
-        return l_x, raw_outputs, outputs
+        if self.predict_only:
+            return l_x
+        else:
+            return l_x, raw_outputs, outputs
 
 # Simpler version of above, but untested
 # class PoolingLinearClassifier(nn.Module):
@@ -421,10 +426,8 @@ class PoolingLinearClassifier(nn.Module):
 
 class TextClassifier(BaseNet):
     # From `fastai`
-    def __init__(self, bptt, max_seq, n_class, n_tok, emb_sz, n_hid, n_layers, pad_token, layers, drops, bidir=False,
-                      dropouth=0.3, dropouti=0.5, dropoute=0.1, wdrop=0.5, loss_fn=None):
-        
-        assert loss_fn is not None, 'loss_fn is None'
+    def __init__(self, bptt, max_seq, n_class, n_tok, emb_sz, n_hid, n_layers, pad_token, head_layers, head_drops, bidir=False,
+                      dropouth=0.3, dropouti=0.5, dropoute=0.1, wdrop=0.5, loss_fn=None, predict_only=False):
         
         super().__init__(loss_fn=loss_fn)
         self.encoder = MultiBatchRNN(
@@ -442,7 +445,7 @@ class TextClassifier(BaseNet):
             wdrop=wdrop
         )
         
-        self.decoder = PoolingLinearClassifier(layers, drops)
+        self.decoder = PoolingLinearClassifier(head_layers, head_drops, predict_only=predict_only)
     
     def forward(self, x):
         x = self.encoder(x)
@@ -466,6 +469,7 @@ class TextClassifier(BaseNet):
 def basenet_train(model, dataloaders, num_epochs, lr_breaks, lr_vals, adam_betas, weight_decay=0, clip_grad_norm=0, 
     save_prefix=None):
     """ Helper for training routine used in this script """
+    
     params = [{
         "params" : parameters_from_children(lg, only_requires_grad=True),
     } for lg in model.get_layer_groups()]

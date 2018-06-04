@@ -97,9 +97,8 @@ if __name__ == "__main__":
         wdrop     = drops[2],
         dropoute  = drops[3],
         dropouth  = drops[4],
-    )
+    ).to('cuda')
     
-    _ = language_model.cuda()
     language_model.verbose = True
     language_model.load_weights(lm_weights)
     set_freeze(language_model, False)

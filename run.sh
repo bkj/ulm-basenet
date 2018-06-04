@@ -64,3 +64,9 @@ python train_classifier.py \
     --X-valid $RUN_PATH/classifier/valid-X.npy \
     --y-train $RUN_PATH/classifier/train-y.npy \
     --y-valid $RUN_PATH/classifier/valid-y.npy > $RUN_PATH/classifier.jl
+
+# Test classifier
+
+python inference.py \
+    --lm-weights-path /home/bjohnson/software/fastai/courses/dl2/simple_imdb2/data/run2/models/cl_final \
+    --X $RUN_PATH/classifier/valid-X.npy

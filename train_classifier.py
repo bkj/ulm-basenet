@@ -4,88 +4,22 @@
     train_classifier.py
 """
 
-import argparse
-
 import os
 import sys
 import json
 import torch
+import argparse
 import numpy as np
 from functools import partial
 
 import torch
 from torch.nn import functional as F
-from torch.utils.data import Dataset, DataLoader
-from torch.utils.data.sampler import Sampler
+from torch.utils.data import DataLoader
 
 from basenet.helpers import set_seeds, set_freeze
+from basenet.text.data import RaggedDataset, text_collate_fn
+
 from ulmfit import TextClassifier, basenet_train
-
-# --
-# Helpers
-
-class RaggedDataset(Dataset):
-    def __init__(self, X, y):
-        assert len(X) == len(y), 'len(X) != len(y)'
-        self.X = [torch.LongTensor(xx) for xx in X]
-        self.y = torch.LongTensor(y)
-    
-    def __getitem__(self, idx):
-        return self.X[idx], self.y[idx]
-    
-    def __len__(self):
-        return len(self.X)
-
-
-def text_collate_fn(batch, pad_value=1):
-    X, y = zip(*batch)
-    
-    max_len = max([len(xx) for xx in X])
-    X = [F.pad(xx, pad=(max_len - len(xx), 0), value=pad_value) for xx in X]
-    
-    X = torch.stack(X, dim=-1)
-    y = torch.LongTensor(y)
-    return X, y
-
-
-class SortishSampler(Sampler):
-    def __init__(self, data_source, key, batch_size, batches_per_chunk=50):
-        self.data_source       = data_source
-        self.key               = key
-        self.batch_size        = batch_size
-        self.batches_per_chunk = batches_per_chunk
-    
-    def __len__(self):
-        return len(self.data_source)
-        
-    def __iter__(self):
-        
-        idxs = np.random.permutation(len(self.data_source))
-        
-        # Group records into batches of similar size
-        chunk_size = self.batch_size * self.batches_per_chunk
-        chunks     = [idxs[i:i+chunk_size] for i in range(0, len(idxs), chunk_size)]
-        idxs       = np.hstack([sorted(chunk, key=self.key, reverse=True) for chunk in chunks])
-        
-        # Make sure largest batch is in front (for memory management reasons)
-        batches         = [idxs[i:i+self.batch_size] for i in range(0, len(idxs), self.batch_size)]
-        batch_order     = np.argsort([self.key(b[0]) for b in batches])[::-1]
-        batch_order[1:] = np.random.permutation(batch_order[1:])
-        
-        idxs            = np.hstack([batches[i] for i in batch_order])
-        return iter(idxs)
-
-
-class SequentialSampler(Sampler):
-    def __init__(self, data_source):
-        self.data_source = data_source
-        
-    def __iter__(self):
-        return iter(range(len(self.data_source)))
-        
-    def __len__(self):
-        return len(self.data_source)
-
 
 # --
 # CLI
@@ -113,6 +47,8 @@ if __name__ == "__main__":
     lr  = 3e-3
     lrm = 2.6
     lrs = np.array([lr / (lrm ** i) for i in range(5)[::-1]])
+    max_seq = 20 * 70
+    pad_token = 1
     
     args = parse_args()
     set_seeds(args.seed)
@@ -122,7 +58,7 @@ if __name__ == "__main__":
     # --
     # IO
     
-    lm_weights = torch.load(args.lm_weights)
+    lm_weights = torch.load(args.lm_weights_path)
     n_tok = lm_weights['encoder.encoder.weight'].shape[0]
     
     X_train = np.load(args.X_train)
@@ -189,30 +125,31 @@ if __name__ == "__main__":
         return loss
     
     classifier = TextClassifier(
-        bptt      = bptt,
-        max_seq   = 20 * 70,
-        n_class   = n_class,
-        n_tok     = n_tok,
-        emb_sz    = emb_sz,
-        n_hid     = n_hid,
-        n_layers  = n_layers,
-        pad_token = 1,
-        layers    = [emb_sz * 3, 50, n_class],
-        drops     = [dps[4], 0.1],
-        dropouti  = dps[0],
-        wdrop     = dps[1],
-        dropoute  = dps[2],
-        dropouth  = dps[3],
-        loss_fn   = partial(text_classifier_loss_fn, alpha=2, beta=1),
-    )
-    _ = classifier.cuda()
+        bptt        = bptt,
+        max_seq     = max_seq,
+        n_class     = n_class,
+        n_tok       = n_tok,
+        emb_sz      = emb_sz,
+        n_hid       = n_hid,
+        n_layers    = n_layers,
+        pad_token   = pad_token,
+        head_layers = [emb_sz * 3, 50, n_class],
+        head_drops  = [dps[4], 0.1],
+        dropouti    = dps[0],
+        wdrop       = dps[1],
+        dropoute    = dps[2],
+        dropouth    = dps[3],
+        loss_fn     = partial(text_classifier_loss_fn, alpha=2, beta=1),
+    ).to('cuda')
     classifier.verbose = True
+    
     # >>
-    # !! Should save encoder weights separately in `finetune_lm.py`
+    # !! Should maybe save encoder weights separately in `finetune_lm.py`
     weights_to_drop = [k for k in lm_weights.keys() if 'decoder.' in k]
     for k in weights_to_drop:
         del lm_weights[k]
     # <<
+    
     classifier.load_state_dict(lm_weights, strict=False)
     set_freeze(classifier, False)
     
