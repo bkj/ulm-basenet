@@ -142,6 +142,7 @@ if __name__ == "__main__":
         loss_fn     = partial(text_classifier_loss_fn, alpha=2, beta=1),
     ).to('cuda')
     classifier.verbose = True
+    print(classifier, file=sys.stderr)
     
     # >>
     # !! Should maybe save encoder weights separately in `finetune_lm.py`

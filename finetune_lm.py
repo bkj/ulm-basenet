@@ -98,6 +98,7 @@ if __name__ == "__main__":
         dropoute  = drops[3],
         dropouth  = drops[4],
     ).to('cuda')
+    print(language_model, file=sys.stderr)
     
     language_model.verbose = True
     language_model.load_weights(lm_weights)
