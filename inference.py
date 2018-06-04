@@ -54,7 +54,7 @@ if __name__ == "__main__":
     n_tok   = lm_weights['encoder.encoder.weight'].shape[0]
     n_class = lm_weights['decoder.layers.1.lin.weight'].shape[0]
     
-    X = np.load(args.X)
+    X = np.load(args.X)[:50]
     o = np.argsort([len(xx) for xx in X])
     X = X[o]
     
