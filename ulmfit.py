@@ -6,9 +6,11 @@
     ULMFIT functions
     
     !! Most of these functions are copied exactly/approximately from the `fastai` library.
+        https://github.com/fastai/fastai
 """
 
 import re
+import json
 import warnings
 import numpy as np
 
@@ -19,6 +21,18 @@ from torch.autograd import Variable
 
 from basenet import BaseNet, HPSchedule
 from basenet.helpers import parameters_from_children
+
+# --
+# Helpers
+
+def detach(x):
+    if isinstance(x, list) or isinstance(x, tuple):
+        return tuple([detach(xx) for xx in x])
+    # elif IS_TORCH_04:
+    #     return x.detach()
+    else:
+        return Variable(x.data)
+
 
 # --
 # LM dataloader
@@ -99,6 +113,7 @@ class WeightDrop(torch.nn.Module):
         self.dropout = dropout
         
         if isinstance(self.module, torch.nn.RNNBase):
+            def noop(*args, **kwargs): return
             self.module.flatten_parameters = noop
         
         for name_w in self.weights:
@@ -137,15 +152,15 @@ class EmbeddingDropout(nn.Module):
         if padding_idx is None:
             padding_idx = -1
         
-        if IS_TORCH_04:
-            X = F.embedding(words,
-                masked_embed_weight, padding_idx, self.embed.max_norm,
-                self.embed.norm_type, self.embed.scale_grad_by_freq, self.embed.sparse)
-        else:
-            X = self.embed._backend.Embedding.apply(words,
-                masked_embed_weight, padding_idx, self.embed.max_norm,
-                self.embed.norm_type, self.embed.scale_grad_by_freq, self.embed.sparse)
-            
+        # if IS_TORCH_04:
+        #     X = F.embedding(words,
+        #         masked_embed_weight, padding_idx, self.embed.max_norm,
+        #         self.embed.norm_type, self.embed.scale_grad_by_freq, self.embed.sparse)
+        # else:
+        X = self.embed._backend.Embedding.apply(words,
+            masked_embed_weight, padding_idx, self.embed.max_norm,
+            self.embed.norm_type, self.embed.scale_grad_by_freq, self.embed.sparse)
+        
         return X
 
 
@@ -219,8 +234,7 @@ class RNN_Encoder(nn.Module):
             
             outputs.append(raw_output)
         
-        self.hidden = tuple([Variable(h.data) for h in new_hidden]) # ?? Replace w/ `.detach` ??
-        # self.hidden = tuple([h.detach() for h in new_hidden])
+        self.hidden = detach(new_hidden)
         return raw_outputs, outputs
 
 
@@ -304,17 +318,6 @@ class LanguageModel(BaseNet):
 # --
 # Classifier classes
 
-class LinearBlock(nn.Module):
-    # From `fastai`
-    def __init__(self, ni, nf, drop):
-        super().__init__()
-        self.bn   = nn.BatchNorm1d(ni)
-        self.drop = nn.Dropout(drop)
-        self.lin  = nn.Linear(ni, nf)
-    
-    def forward(self, x):
-        return self.lin(self.drop(self.bn(x)))
-
 
 class MultiBatchRNN(RNN_Encoder):
     # From `fastai`
@@ -338,6 +341,18 @@ class MultiBatchRNN(RNN_Encoder):
                 outputs.append(output)
         
         return self.concat(raw_outputs), self.concat(outputs)
+
+
+class LinearBlock(nn.Module):
+    # From `fastai`
+    def __init__(self, ni, nf, drop):
+        super().__init__()
+        self.bn   = nn.BatchNorm1d(ni)
+        self.drop = nn.Dropout(drop)
+        self.lin  = nn.Linear(ni, nf)
+    
+    def forward(self, x):
+        return self.lin(self.drop(self.bn(x)))
 
 
 class PoolingLinearClassifier(nn.Module):
@@ -366,6 +381,41 @@ class PoolingLinearClassifier(nn.Module):
             x = F.relu(l_x)
         
         return l_x, raw_outputs, outputs
+
+# Simpler version of above, but untested
+# class PoolingLinearClassifier(nn.Module):
+#     # From `fastai` -- needs testing
+#     def __init__(self, layers, drops):
+#         super().__init__()
+        
+#         self.layers = []
+#         for i in range(len(layers) - 1):
+#             self.layers += [
+#                 nn.BatchNorm1d(num_features=layers[i]),
+#                 nn.Dropout(p=drops[i]),
+#                 nn.Linear(in_features=layers[i], out_features=layers[i + 1]),
+#                 nn.ReLU(),
+#             ]
+        
+#         self.layers.pop() # Remove last relu
+        
+#         self.layers = nn.Sequential(*self.layers)
+    
+#     def pool(self, x, bs, is_max):
+#         pool_fn = F.adaptive_max_pool1d if is_max else F.adaptive_avg_pool1d
+#         return pool_fn(x.permute(1,2,0), (1,)).view(bs,-1)
+        
+#     def forward(self, x):
+#         raw_outputs, outputs = x
+#         output = outputs[-1]
+#         bs = output.size()[1]
+#         x = torch.cat([
+#             output[-1],
+#             self.pool(output, bs, is_max=True), 
+#             self.pool(output, bs, is_max=False),
+#         ], 1)
+            
+#         return self.layers(x), raw_outputs, outputs
 
 
 class TextClassifier(BaseNet):

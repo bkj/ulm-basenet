@@ -10,9 +10,11 @@
 
 import re
 import spacy
+from spacy.symbols import ORTH
 from concurrent.futures import ProcessPoolExecutor
 
-class FastaiTokenizer():
+
+class Tokenizer():
     re_rep      = re.compile(r'(\S)(\1{3,})')
     re_word_rep = re.compile(r'(\b\w+\W+)(\1{3,})')
     re_br       = re.compile(r'<\s*br\s*/?>', re.IGNORECASE)

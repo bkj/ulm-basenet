@@ -15,7 +15,7 @@ import numpy as np
 import pandas as pd
 from collections import Counter, defaultdict
 
-from fastai_tokenizer import FastaiTokenizer
+from fastai_tokenizer import Tokenizer
 
 # --
 # CLI
@@ -31,6 +31,7 @@ def parse_args():
     parser.add_argument('--no-labels', action="store_true")
     args = parser.parse_args()
     assert not (args.load_itos and args.save_itos), 'only one of `--save-itos` or `--load-itos` may be set'
+    assert (args.load_itos or args.save_itos), 'one of `--save-itos` or `--load-itos` must be set'
     return args
 
 # --
@@ -77,25 +78,25 @@ if __name__ == "__main__":
     os.makedirs(args.outpath, exist_ok=True)
     
     print('featurize.py: loading %s' % args.inpath, file=sys.stderr)
-    df = pd.read_csv(args.inpath, header=None, chunksize=12000)
+    df = pd.read_csv(args.inpath, header=None, chunksize=24000)
     tok, labels = get_all(df, n_lbls=1)
     
     if args.save_itos:
-        print('featurize.py: computing itos', file=sys.stderr)
+        print('featurize.py: computing itos and writing to %s' % args.save_itos, file=sys.stderr)
         freq = Counter(p for o in tok for p in o)
         itos = [o for o,c in freq.most_common(args.max_vocab) if c > args.min_freq]
         itos.insert(0, '_pad_')
         itos.insert(0, '_unk_')
         pickle.dump(itos, open(args.save_itos, 'wb'))
     else:
-        print('featurize.py: loading itos %s' % args.itospath, file=sys.stderr)
+        print('featurize.py: loading itos from %s' % args.load_itos, file=sys.stderr)
         itos = pickle.load(open(args.load_itos, 'rb'))
     
     stoi = defaultdict(lambda:0, {v:k for k,v in enumerate(itos)})
     ids  = np.array([[stoi[o] for o in p] for p in tok])
     
     print('featurize.py: writing to %s' % args.outpath, file=sys.stderr)
-    np.save('%s-%s' % (args.outpath, '-tok.npy'), tok)
-    np.save('%s-%s' % (args.outpath, '-X.npy'), ids)
+    np.save('%s-%s' % (args.outpath, 'tok.npy'), tok)
+    np.save('%s-%s' % (args.outpath, 'X.npy'), ids)
     if not args.no_labels:
-        np.save('%s-%s' % (args.outpath, '-y.npy'), labels)
+        np.save('%s-%s' % (args.outpath, 'y.npy'), labels)

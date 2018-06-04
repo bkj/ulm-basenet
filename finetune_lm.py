@@ -15,6 +15,8 @@ import numpy as np
 from basenet.helpers import to_numpy, set_seeds, set_freeze
 from ulmfit import LanguageModelLoader, LanguageModel, basenet_train
 
+assert torch.__version__.split('.')[1] == '3', 'Downgrade to pytorch==0.3.2 (for now)'
+
 # --
 # CLI
 
@@ -96,10 +98,12 @@ if __name__ == "__main__":
         dropoute  = drops[3],
         dropouth  = drops[4],
     )
+    
     _ = language_model.cuda()
     language_model.verbose = True
     language_model.load_weights(lm_weights)
     set_freeze(language_model, False)
+    _ = language_model.train()
     
     # --
     # Load data
@@ -124,7 +128,7 @@ if __name__ == "__main__":
         lr_vals=[lrs / 64, lrs / 2, lrs / 64],
         adam_betas=(0.8, 0.99),
         weight_decay=wd,
-        save_previx=os.path.join(args.outpath, 'lm_ft_last'),
+        save_prefix=os.path.join(args.outpath, 'lm_ft_last'),
     )
     
     # Finetune end-to-end
@@ -137,5 +141,5 @@ if __name__ == "__main__":
         lr_vals=[lrs / 20, lrs, lrs / 20],
         adam_betas=(0.8, 0.99),
         weight_decay=wd,
-        save_previx=os.path.join(args.outpath, 'lm_ft_final'),
+        save_prefix=os.path.join(args.outpath, 'lm_ft_final'),
     )
