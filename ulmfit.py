@@ -7,6 +7,8 @@
     
     !! Most of these functions are copied exactly/approximately from the `fastai` library.
         https://github.com/fastai/fastai
+    
+    !! This hasn't been tested on torch>=0.4
 """
 
 import re
@@ -262,7 +264,7 @@ class LinearDecoder(nn.Module):
         x = self.decoder(x)
         x = x.view(-1, x.size(1))
         
-        return x, raw_outputs, outputs # !! Why?
+        return x, raw_outputs, outputs
 
 
 class LanguageModel(BaseNet):
@@ -322,9 +324,10 @@ class LanguageModel(BaseNet):
 
 class MultiBatchRNN(RNN_Encoder):
     # From `fastai`
-    def __init__(self, bptt, max_seq, *args, **kwargs):
-        self.max_seq = max_seq
-        self.bptt    = bptt
+    def __init__(self, bptt, max_seq, predict_only=False, *args, **kwargs):
+        self.max_seq      = max_seq
+        self.bptt         = bptt
+        self.predict_only = predict_only
         super().__init__(*args, **kwargs)
         
     def concat(self, arrs):
@@ -372,6 +375,7 @@ class PoolingLinearClassifier(nn.Module):
     def forward(self, x):
         raw_outputs, outputs = x
         output = outputs[-1]
+        
         bs = output.size()[1]
         x = torch.cat([
             output[-1],
@@ -433,6 +437,7 @@ class TextClassifier(BaseNet):
         self.encoder = MultiBatchRNN(
             bptt=bptt,
             max_seq=max_seq,
+            predict_only=predict_only,
             n_tok=n_tok,
             emb_sz=emb_sz,
             nhid=n_hid,
@@ -442,7 +447,7 @@ class TextClassifier(BaseNet):
             dropouth=dropouth,
             dropouti=dropouti,
             dropoute=dropoute, 
-            wdrop=wdrop
+            wdrop=wdrop,
         )
         
         self.decoder = PoolingLinearClassifier(head_layers, head_drops, predict_only=predict_only)

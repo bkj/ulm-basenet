@@ -15,7 +15,6 @@ from functools import partial
 import torch
 from torch.nn import functional as F
 from torch.utils.data import DataLoader
-from torch.utils.data.sampler import SequentialSampler
 
 from basenet.helpers import set_seeds, set_freeze, to_numpy
 from basenet.text.data import RaggedDataset, text_collate_fn
@@ -51,20 +50,22 @@ if __name__ == "__main__":
     # IO
     
     lm_weights = torch.load(args.lm_weights_path)
-
+    
     n_tok   = lm_weights['encoder.encoder.weight'].shape[0]
     n_class = lm_weights['decoder.layers.1.lin.weight'].shape[0]
     
     X = np.load(args.X)
-    o = np.argsort([len(xx) for xx in X])
+    
+    # Sort validation data by length, longest to shortest, for efficiency
+    o = np.argsort([len(xx) for xx in X])[::-1]
     X = X[o]
     
     dataloaders = {
         "inference" : DataLoader(
             dataset=RaggedDataset(X, y=torch.zeros(len(X)).long() - 1),
-            sampler=SequentialSampler(X),
             batch_size=batch_size,
             collate_fn=text_collate_fn,
+            shuffle=False,
             num_workers=1,
         )
     }
@@ -84,7 +85,7 @@ if __name__ == "__main__":
         head_layers  = [emb_sz * 3, 50, n_class],
         head_drops   = [0.0, 0.0],
         predict_only = True
-    ).to('cpu')
+    ).to('cuda')
     classifier.verbose = True
     classifier.load_state_dict(lm_weights, strict=True)
     

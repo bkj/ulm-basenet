@@ -79,8 +79,8 @@ if __name__ == "__main__":
         open(os.path.join(args.outpath, 'classes.json'), 'w')
     )
     
-    # Sort validation data by length, for efficiency
-    o = np.argsort([len(x) for x in X_valid])
+    # Sort validation data by length, longest to shortest, for efficiency
+    o = np.argsort([len(x) for x in X_valid])[::-1]
     X_valid, y_valid = X_valid[o], y_valid[o]
     
     dataloaders = {
