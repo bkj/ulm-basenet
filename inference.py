@@ -17,7 +17,7 @@ from torch.nn import functional as F
 from torch.utils.data import DataLoader
 from torch.utils.data.sampler import SequentialSampler
 
-from basenet.helpers import set_seeds, set_freeze
+from basenet.helpers import set_seeds, set_freeze, to_numpy
 from basenet.text.data import RaggedDataset, text_collate_fn
 
 from ulmfit import TextClassifier, basenet_train
@@ -29,6 +29,7 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--lm-weights-path', type=str)
     parser.add_argument('--X', type=str)
+    parser.add_argument('--outpath', type=str, default='preds')
     parser.add_argument('--seed', type=int, default=123)
     return parser.parse_args()
 
@@ -54,7 +55,7 @@ if __name__ == "__main__":
     n_tok   = lm_weights['encoder.encoder.weight'].shape[0]
     n_class = lm_weights['decoder.layers.1.lin.weight'].shape[0]
     
-    X = np.load(args.X)[:50]
+    X = np.load(args.X)
     o = np.argsort([len(xx) for xx in X])
     X = X[o]
     
@@ -83,10 +84,12 @@ if __name__ == "__main__":
         head_layers  = [emb_sz * 3, 50, n_class],
         head_drops   = [0.0, 0.0],
         predict_only = True
-    )
-    classifier.to('cpu')
+    ).to('cpu')
     classifier.verbose = True
     classifier.load_state_dict(lm_weights, strict=True)
     
-    preds = classifier.predict(dataloaders, mode='inference')
-    print(preds)
+    preds, _ = classifier.predict(dataloaders, mode='inference')
+    # return to correct order
+    preds = to_numpy(preds)[np.argsort(o)]
+    
+    np.savetxt(args.outpath, preds, fmt='%.10f', delimiter='\t')
