@@ -17,7 +17,8 @@ mv fwd_wt103.h5 itos_wt103.pkl models/wt103/
 # --
 # Run
 
-RUN_PATH="runs/0"
+export CUDA_VISIBLE_DEVICES=0
+RUN_PATH="runs/2"
 
 # Train/test split (language model and classifier)
 python make-splits.py \
@@ -54,25 +55,25 @@ python finetune_lm.py \
     --itos-path $RUN_PATH/itos.pkl \
     --outpath $RUN_PATH/lm/weights/ \
     --X-train $RUN_PATH/lm/train-X.npy \
-    --X-valid $RUN_PATH/lm/valid-X.npy > $RUN_PATH/lm-2.jl
+    --X-valid $RUN_PATH/lm/valid-X.npy > $RUN_PATH/lm.jl
 
 # Train classifier
 python train_classifier.py \
-    --lm-weights-path runs/0/lm/weights/lm_ft_final-epoch14.h5 \
+    --lm-weights-path $RUN_PATH/lm/weights/lm_ft_final-epoch14.h5 \
     --outpath $RUN_PATH/classifier/weights \
     --X-train $RUN_PATH/classifier/train-X.npy \
     --X-valid $RUN_PATH/classifier/valid-X.npy \
     --y-train $RUN_PATH/classifier/train-y.npy \
-    --y-valid $RUN_PATH/classifier/valid-y.npy
+    --y-valid $RUN_PATH/classifier/valid-y.npy > $RUN_PATH/classifier.jl
 
 
 # Perform inference
-CUDA_VISIBLE_DEVICES=1 python inference.py \
+python inference.py \
     --lm-weights-path /home/bjohnson/software/fastai/courses/dl2/simple_imdb2/data/run2/models/cl_final \
     --X $RUN_PATH/classifier/valid-X.npy \
     --outpath preds-classifier-valid
 
-CUDA_VISIBLE_DEVICES=1 python inference.py \
+python inference.py \
     --lm-weights-path /home/bjohnson/software/fastai/courses/dl2/simple_imdb2/data/run2/models/cl_final \
     --X $RUN_PATH/lm/valid-X.npy \
     --outpath preds-lm-valid
