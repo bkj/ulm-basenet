@@ -6,20 +6,18 @@
 
 import os
 import sys
-import json
 import torch
 import argparse
 import numpy as np
-from functools import partial
 
 import torch
 from torch.nn import functional as F
 from torch.utils.data import DataLoader
 
-from basenet.helpers import set_seeds, set_freeze, to_numpy
+from basenet.helpers import set_seeds, to_numpy
 from basenet.text.data import RaggedDataset, text_collate_fn
 
-from ulmfit import TextClassifier, basenet_train
+from ulmfit import TextClassifier
 
 # --
 # CLI
@@ -69,9 +67,8 @@ if __name__ == "__main__":
     # Define model
     
     lm_weights = torch.load(args.lm_weights_path)
-    
-    n_tok   = lm_weights['encoder.encoder.weight'].shape[0]
-    n_class = lm_weights['decoder.layers.1.lin.weight'].shape[0]
+    n_tok   = lm_weights['encoder.encoder.weight'].shape[0]    # Shape of encoding matrix
+    n_class = lm_weights[list(lm_weights.keys())[-1]].shape[0] # Shape of last weights
     
     classifier = TextClassifier(
         bptt         = bptt,

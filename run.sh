@@ -75,12 +75,13 @@ python train_classifier.py \
 
 
 # Perform inference
+mkdir -p $RUN_PATH/classifier/preds/
 python inference.py \
-    --lm-weights-path NOMODEL \
-    --X $RUN_PATH/classifier/valid-X.npy \
-    --outpath preds-classifier-valid
+    --lm-weights-path $RUN_PATH/classifier/weights/cl_final-epoch13.h5 \
+    --X $RUN_PATH/classifier/train-X.npy \
+    --outpath $RUN_PATH/classifier/preds/classifier-train
 
 python inference.py \
-    --lm-weights-path NOMODEL \
-    --X $RUN_PATH/lm/valid-X.npy \
-    --outpath preds-lm-valid
+    --lm-weights-path $RUN_PATH/classifier/weights/cl_final-epoch13.h5 \
+    --X $RUN_PATH/lm/train-X.npy \
+    --outpath $RUN_PATH/classifier/preds/lm-train
