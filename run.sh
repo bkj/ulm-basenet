@@ -56,7 +56,7 @@ python featurize.py \
     --max-vocab $MAX_VOCAB
 
 # Finetune LM
-CUDA_VISIBLE_DEVICES=6 python finetune_lm.py \
+python finetune_lm.py \
     --lm-weights-path models/wt103/fwd_wt103.h5 \
     --lm-itos-path models/wt103/itos_wt103.pkl \
     --itos-path $RUN_PATH/itos.pkl \
@@ -65,7 +65,7 @@ CUDA_VISIBLE_DEVICES=6 python finetune_lm.py \
     --X-valid $RUN_PATH/lm/valid-X.npy | tee $RUN_PATH/lm.jl
 
 # Train classifier
-CUDA_VISIBLE_DEVICES=6 python train_classifier.py \
+python train_classifier.py \
     --lm-weights-path $RUN_PATH/lm/weights/lm_ft_final-epoch14.h5 \
     --outpath $RUN_PATH/classifier/weights \
     --X-train $RUN_PATH/classifier/train-X.npy \

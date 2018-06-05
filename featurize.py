@@ -75,8 +75,6 @@ def get_all(df, n_lbls):
 if __name__ == "__main__":
     args = parse_args()
     
-    os.makedirs(args.outpath, exist_ok=True)
-    
     print('featurize.py: loading %s' % args.inpath, file=sys.stderr)
     df = pd.read_csv(args.inpath, header=None, chunksize=24000)
     tok, labels = get_all(df, n_lbls=1)
