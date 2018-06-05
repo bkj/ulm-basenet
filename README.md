@@ -24,5 +24,6 @@ See `./run.sh` for usage.
 
 #### Todo
 
-- Update to pytorch==0.4 + test
-- Test installation
+- Test update to pytorch==0.4
+    - Bug in pytorch prevents running `finetune_lm.py` w/ 0.4
+        - https://github.com/pytorch/pytorch/issues/7722)

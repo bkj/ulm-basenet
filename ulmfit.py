@@ -25,17 +25,18 @@ from torch.autograd import Variable
 from basenet import BaseNet, HPSchedule
 from basenet.helpers import parameters_from_children
 
+TORCH_VERSION_4 = '0.4' == torch.__version__[:3]
+
 # --
 # Helpers
 
 def detach(x):
     if isinstance(x, list) or isinstance(x, tuple):
         return tuple([detach(xx) for xx in x])
-    # elif IS_TORCH_04:
-    #     return x.detach()
+    elif TORCH_VERSION_4:
+        return x.detach()
     else:
         return Variable(x.data)
-
 
 # --
 # LM dataloader
@@ -103,7 +104,10 @@ class LockedDropout(nn.Module):
             return x
         else:
             mask = dropout_mask(x.data, (1, x.shape[1], x.shape[2]), self.p)
-            mask = Variable(mask, requires_grad=False)
+            if TORCH_VERSION_4:
+                mask = mask.requires_grad_(False)
+            else:
+                mask = Variable(mask, requires_grad=False)
             return mask * x
     
     def __repr__(self):
@@ -150,7 +154,10 @@ class EmbeddingDropout(nn.Module):
     def forward(self, words, dropout=0.1, scale=None):
         if dropout:
             mask = dropout_mask(self.embed.weight.data, (self.embed.weight.size(0), 1), dropout)
-            mask = Variable(mask)
+            if TORCH_VERSION_4:
+                mask = mask.requires_grad_(False)
+            else:
+                mask = Variable(mask, requires_grad=False)
             masked_embed_weight = mask * self.embed.weight
         else:
             masked_embed_weight = self.embed.weight
@@ -162,14 +169,14 @@ class EmbeddingDropout(nn.Module):
         if padding_idx is None:
             padding_idx = -1
         
-        # if IS_TORCH_04:
-        #     X = F.embedding(words,
-        #         masked_embed_weight, padding_idx, self.embed.max_norm,
-        #         self.embed.norm_type, self.embed.scale_grad_by_freq, self.embed.sparse)
-        # else:
-        return self.embed._backend.Embedding.apply(words,
-            masked_embed_weight, padding_idx, self.embed.max_norm,
-            self.embed.norm_type, self.embed.scale_grad_by_freq, self.embed.sparse)
+        if TORCH_VERSION_4:
+            return F.embedding(words,
+                masked_embed_weight, padding_idx, self.embed.max_norm,
+                self.embed.norm_type, self.embed.scale_grad_by_freq, self.embed.sparse)
+        else:
+            return self.embed._backend.Embedding.apply(words,
+                masked_embed_weight, padding_idx, self.embed.max_norm,
+                self.embed.norm_type, self.embed.scale_grad_by_freq, self.embed.sparse)
     
     def __repr__(self):
         return 'EmbeddingDropout(%s)' % self.embed.__repr__()
@@ -199,7 +206,7 @@ class RNN_Encoder(nn.Module):
                 hidden_size=(nhid if l != nlayers - 1 else emb_sz) // self.ndir,
                 num_layers=1, 
                 bidirectional=bidir, 
-                dropout=dropouth
+                dropout=dropouth # Should remove here, per warning
             ) for l in range(nlayers)
         ]
         self.rnns = [WeightDrop(rnn, dropout=wdrop) for rnn in self.rnns]
@@ -210,7 +217,10 @@ class RNN_Encoder(nn.Module):
     
     def one_hidden(self, l):
         nh = (self.nhid if l != self.nlayers - 1 else self.emb_sz) // self.ndir
-        return Variable(self.weights.new(self.ndir, self.batch_size, nh).zero_(), volatile=not self.training)
+        if TORCH_VERSION_4:
+            return self.weights.new(self.ndir, self.batch_size, nh).zero_()
+        else:
+            return Variable(self.weights.new(self.ndir, self.batch_size, nh).zero_(), volatile=not self.training)
         
     def reset(self):
         self.weights = next(self.parameters()).data
@@ -228,7 +238,6 @@ class RNN_Encoder(nn.Module):
         raw_output = emb
         new_hidden, raw_outputs, outputs = [], [], []
         for l, (rnn, drop) in enumerate(zip(self.rnns, self.dropouths)):
-            
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
                 raw_output, new_h = rnn(raw_output, self.hidden[l])
@@ -261,14 +270,14 @@ class LinearDecoder(nn.Module):
         self.dropout = LockedDropout(dropout)
     
     def forward(self, input):
-        raw_outputs, outputs = input
+        _, x = input
         
-        x = self.dropout(outputs[-1])
-        x = x.view(x.size(0) * x.size(1), x.size(2))
+        x = self.dropout(x[-1])
+        x = x.view(x.shape[0] * x.shape[1], x.shape[2])
         x = self.decoder(x)
-        x = x.view(-1, x.size(1))
+        x = x.view(-1, x.shape[1])
         
-        return x, raw_outputs, outputs
+        return x
 
 
 class LanguageModel(BaseNet):
@@ -276,7 +285,7 @@ class LanguageModel(BaseNet):
                  dropout=0.4, dropouth=0.3, dropouti=0.5, dropoute=0.1, wdrop=0.5, tie_weights=True):
         
         def _lm_loss_fn(output, target):
-            return F.cross_entropy(output[0], target)
+            return F.cross_entropy(output, target)
         
         super().__init__(loss_fn=_lm_loss_fn)
         
@@ -313,18 +322,17 @@ class LanguageModel(BaseNet):
     def reset(self):
         _ = [c.reset() for c in self.children() if hasattr(c, 'reset')]
         
-    def load_weights(self, wgts):
+    def load_weights(self, wgts, strict=True):
         tmp = {}
         for k,v in wgts.items():
             k = re.sub(r'^0.', 'encoder.', k)
             k = re.sub(r'^1.', 'decoder.', k)
             tmp[k] = v
         
-        self.load_state_dict(tmp)
+        self.load_state_dict(tmp, strict=strict)
 
 # --
-# Classifier classes
-
+# Classifier
 
 class MultiBatchRNN(RNN_Encoder):
     # From `fastai`

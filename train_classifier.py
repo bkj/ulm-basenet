@@ -114,12 +114,12 @@ if __name__ == "__main__":
         
         # Activation Regularization
         if alpha:
-            loss = loss + sum(alpha * last_output.pow(2).mean())
+            loss = loss + (alpha * last_output.pow(2).mean())
         
         # Temporal Activation Regularization (slowness)
         if beta: 
             if len(last_raw_output) > 1:
-                loss = loss + sum(beta * (last_raw_output[1:] - last_raw_output[:-1]).pow(2).mean())
+                loss = loss + (beta * (last_raw_output[1:] - last_raw_output[:-1]).pow(2).mean())
         
         return loss
         

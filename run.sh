@@ -59,7 +59,7 @@ python finetune_lm.py \
 
 # Train classifier
 python train_classifier.py \
-    --lm-weights-path $RUN_PATH/lm/weights/lm_ft_final-epoch14.h5 \
+    --lm-weights-path $RUN_PATH/lm/weights/lm_ft_final-epoch2.h5 \
     --outpath $RUN_PATH/classifier/weights \
     --X-train $RUN_PATH/classifier/train-X.npy \
     --X-valid $RUN_PATH/classifier/valid-X.npy \
