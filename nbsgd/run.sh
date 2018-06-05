@@ -2,17 +2,30 @@
 
 # run.sh
 
-# --
-# Download data
-
 mkdir -p data
-wget http://ai.stanford.edu/~amaas/data/sentiment/aclImdb_v1.tar.gz
-tar -xzvf aclImdb_v1.tar.gz && rm aclImdb_v1.tar.gz
-mv aclImdb ./data/aclImdb
+mkdir -p preds
 
 # --
-# Run
+# Train ULM model
 
-python prep.py
-python nbsgd.py
+# .. train IMDB model using `run.sh` in $PROJECT_ROOT ..
 
+# --
+# Predict on training set + unlabeled set
+
+python inference.py \
+    --lm-weights-path ../$RUN_PATH/classifier/weights/cl_final-epoch13.h5 \
+    --X ../$RUN_PATH/classifier/train-X.npy \
+    --outpath preds/classifier-train
+
+python inference.py \
+    --lm-weights-path ../$RUN_PATH/classifier/weights/cl_final-epoch13.h5 \
+    --X ../$RUN_PATH/lm/train-X.npy \
+    --outpath nbsgd/preds/lm-train
+
+# --
+# Train NBSGD model (adapted from `https://github.com/bkj/basenet/tree/master/examples/nbsgd`)
+
+cd nbsgd
+python prep.py --inpath ../$RUN_PATH
+python nbsgd.py 

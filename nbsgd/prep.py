@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-    nbsgd.py
+    prep.py
 """
 
 import os
@@ -15,7 +15,6 @@ import pandas as pd
 
 from scipy.sparse import coo_matrix, csr_matrix
 from sklearn.feature_extraction.text import CountVectorizer
-
 
 # --
 # Helpers
@@ -47,6 +46,7 @@ def bow2adjlist(X, maxcols=None):
 
 def parse_args():
     parser = argparse.ArgumentParser()
+    parser.add_argument('--inpath', type=str)
     parser.add_argument('--max-features', type=int, default=200000)
     parser.add_argument('--max-words', type=int, default=1000)
     parser.add_argument('--ngram-range', type=str, default='1,3')
@@ -59,25 +59,22 @@ if __name__ == "__main__":
     
     # --
     # IO
+    
     print("prep.py: loading", file=sys.stderr)
     
-    # >>
-    # text_train, y_train = texts_from_folders('data/aclImdb/train', ['neg', 'pos'])
-    # text_test, y_test = texts_from_folders('data/aclImdb/test', ['neg', 'pos'])
-    # --
-    train = pd.read_csv('../runs/0/classifier/train.csv', header=None, sep=',')
+    train = pd.read_csv(os.path.join(args.inpath, 'classifier/train.csv'), header=None, sep=',')
     y_train, text_train = train.values.T
     
-    test = pd.read_csv('../runs/0/classifier/valid.csv', header=None, sep=',')
+    test = pd.read_csv(os.path.join(args.inpath, 'classifier/valid.csv'), header=None, sep=',')
     y_test, text_test = test.values.T
     
-    lm = pd.read_csv('../runs/0/lm/train.csv', header=None, sep=',')
+    lm = pd.read_csv(os.path.join(args.inpath, 'lm/train.csv'), header=None, sep=',')
     text_lm = lm.values[:,1]
     y_lm = (np.zeros(text_lm.shape[0]) - 1).astype(int)
-    # <<
     
     # --
     # Preprocess
+    
     print("prep.py: preprocessing", file=sys.stderr)
     
     re_tok = re.compile('([%s“”¨«»®´·º½¾¿¡§£₤‘’])' % string.punctuation)
@@ -98,17 +95,18 @@ if __name__ == "__main__":
     
     # --
     # Save
+    
     print("prep.py: saving", file=sys.stderr)
     
-    np.save('./data/aclImdb/X_train', X_train)
-    np.save('./data/aclImdb/X_test', X_test)
-    np.save('./data/aclImdb/X_lm', X_test)
+    np.save('./data/X_train', X_train)
+    np.save('./data/X_test', X_test)
+    np.save('./data/X_lm', X_test)
     
-    np.save('./data/aclImdb/X_train_words', X_train_words)
-    np.save('./data/aclImdb/X_test_words', X_test_words)
-    np.save('./data/aclImdb/X_lm_words', X_lm_words)
+    np.save('./data/X_train_words', X_train_words)
+    np.save('./data/X_test_words', X_test_words)
+    np.save('./data/X_lm_words', X_lm_words)
     
-    np.save('./data/aclImdb/y_train', y_train)
-    np.save('./data/aclImdb/y_test', y_test)
-    np.save('./data/aclImdb/y_lm', y_lm)
+    np.save('./data/y_train', y_train)
+    np.save('./data/y_test', y_test)
+    np.save('./data/y_lm', y_lm)
 
