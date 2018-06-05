@@ -7,7 +7,7 @@
 mkdir -p {data,models}
 wget http://ai.stanford.edu/~amaas/data/sentiment/aclImdb_v1.tar.gz
 tar -xzf aclImdb_v1.tar.gz && mv aclImdb data/aclImdb/
-
+rm aclImdb_v1.tar.gz
 
 wget http://files.fast.ai/models/wt103/fwd_wt103.h5
 wget http://files.fast.ai/models/wt103/itos_wt103.pkl
@@ -18,7 +18,7 @@ mv fwd_wt103.h5 itos_wt103.pkl models/wt103/
 # Run
 
 export CUDA_VISIBLE_DEVICES=0
-RUN_PATH="runs/2"
+RUN_PATH="runs/0"
 
 # Train/test split (language model and classifier)
 python make-splits.py \
