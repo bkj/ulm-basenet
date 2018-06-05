@@ -15,9 +15,10 @@ from functools import partial
 import torch
 from torch.nn import functional as F
 from torch.utils.data import DataLoader
+from torch.utils.data.sampler import SequentialSampler
 
 from basenet.helpers import set_seeds, set_freeze
-from basenet.text.data import RaggedDataset, text_collate_fn
+from basenet.text.data import RaggedDataset, SortishSampler, text_collate_fn
 
 from ulmfit import TextClassifier, basenet_train
 
@@ -27,7 +28,7 @@ from ulmfit import TextClassifier, basenet_train
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--lm-weights-path', type=str)
-    parser.add_argument('--outpath', type=str, default='./.bak')
+    parser.add_argument('--outpath', type=str)
     parser.add_argument('--X-train', type=str)
     parser.add_argument('--y-train', type=str)
     parser.add_argument('--X-valid', type=str)
@@ -58,9 +59,6 @@ if __name__ == "__main__":
     # --
     # IO
     
-    lm_weights = torch.load(args.lm_weights_path)
-    n_tok = lm_weights['encoder.encoder.weight'].shape[0]
-    
     X_train = np.load(args.X_train)
     y_train = np.load(args.y_train).squeeze()
     
@@ -86,10 +84,11 @@ if __name__ == "__main__":
     dataloaders = {
         "train" : DataLoader(
             dataset=RaggedDataset(X_train, y_train),
-            sampler=SortishSampler(X_train, key=lambda idx: len(X_train[idx]), bs=batch_size//2),
+            sampler=SortishSampler(X_train, batch_size=batch_size//2),
             batch_size=batch_size//2,
             collate_fn=text_collate_fn,
             num_workers=1,
+            pin_memory=True,
         ),
         "valid" : DataLoader(
             dataset=RaggedDataset(X_valid, y_valid),
@@ -97,6 +96,7 @@ if __name__ == "__main__":
             batch_size=batch_size,
             collate_fn=text_collate_fn,
             num_workers=1,
+            pin_memory=True,
         )
     }
     
@@ -107,22 +107,24 @@ if __name__ == "__main__":
         assert isinstance(x, tuple), 'not isinstance(x, tuple)'
         assert len(x) == 3, 'len(x) != 3'
         
-        l_x, raw_outputs, outputs = x
+        l_x, last_raw_output, last_output = x
         
         # Cross entropy loss
         loss = F.cross_entropy(l_x, target)
         
         # Activation Regularization
         if alpha:
-            loss = loss + sum(alpha * outputs[-1].pow(2).mean())
+            loss = loss + sum(alpha * last_output.pow(2).mean())
         
         # Temporal Activation Regularization (slowness)
         if beta: 
-            h = raw_outputs[-1]
-            if len(h) > 1:
-                loss = loss + sum(beta * (h[1:] - h[:-1]).pow(2).mean())
+            if len(last_raw_output) > 1:
+                loss = loss + sum(beta * (last_raw_output[1:] - last_raw_output[:-1]).pow(2).mean())
         
         return loss
+        
+    lm_weights = torch.load(args.lm_weights_path)
+    n_tok = lm_weights['encoder.encoder.weight'].shape[0]
     
     classifier = TextClassifier(
         bptt        = bptt,

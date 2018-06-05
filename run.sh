@@ -48,25 +48,31 @@ python featurize.py \
     --load-itos $RUN_PATH/itos.pkl
 
 # Finetune LM
-CUDA_VISIBLE_DEVICES=0 python finetune_lm.py \
+python finetune_lm.py \
     --lm-weights-path models/wt103/fwd_wt103.h5 \
     --lm-itos-path models/wt103/itos_wt103.pkl \
     --itos-path $RUN_PATH/itos.pkl \
     --outpath $RUN_PATH/lm/weights/ \
     --X-train $RUN_PATH/lm/train-X.npy \
-    --X-valid $RUN_PATH/lm/valid-X.npy > $RUN_PATH/lm.jl
+    --X-valid $RUN_PATH/lm/valid-X.npy > $RUN_PATH/lm-2.jl
 
 # Train classifier
 python train_classifier.py \
-    --lm-weights-path $RUN_PATH/lm/weights/lm_ft_final.h5 \
+    --lm-weights-path runs/0/lm/weights/lm_ft_final-epoch14.h5 \
     --outpath $RUN_PATH/classifier/weights \
     --X-train $RUN_PATH/classifier/train-X.npy \
     --X-valid $RUN_PATH/classifier/valid-X.npy \
     --y-train $RUN_PATH/classifier/train-y.npy \
-    --y-valid $RUN_PATH/classifier/valid-y.npy > $RUN_PATH/classifier.jl
+    --y-valid $RUN_PATH/classifier/valid-y.npy
 
-# Test classifier
 
-python inference.py \
+# Perform inference
+CUDA_VISIBLE_DEVICES=1 python inference.py \
     --lm-weights-path /home/bjohnson/software/fastai/courses/dl2/simple_imdb2/data/run2/models/cl_final \
-    --X $RUN_PATH/classifier/valid-X.npy
+    --X $RUN_PATH/classifier/valid-X.npy \
+    --outpath preds-classifier-valid
+
+CUDA_VISIBLE_DEVICES=1 python inference.py \
+    --lm-weights-path /home/bjohnson/software/fastai/courses/dl2/simple_imdb2/data/run2/models/cl_final \
+    --X $RUN_PATH/lm/valid-X.npy \
+    --outpath preds-lm-valid

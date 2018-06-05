@@ -49,11 +49,6 @@ if __name__ == "__main__":
     # --
     # IO
     
-    lm_weights = torch.load(args.lm_weights_path)
-    
-    n_tok   = lm_weights['encoder.encoder.weight'].shape[0]
-    n_class = lm_weights['decoder.layers.1.lin.weight'].shape[0]
-    
     X = np.load(args.X)
     
     # Sort validation data by length, longest to shortest, for efficiency
@@ -73,6 +68,11 @@ if __name__ == "__main__":
     # --
     # Define model
     
+    lm_weights = torch.load(args.lm_weights_path)
+    
+    n_tok   = lm_weights['encoder.encoder.weight'].shape[0]
+    n_class = lm_weights['decoder.layers.1.lin.weight'].shape[0]
+    
     classifier = TextClassifier(
         bptt         = bptt,
         max_seq      = max_seq,
@@ -88,8 +88,10 @@ if __name__ == "__main__":
     ).to('cuda')
     classifier.verbose = True
     classifier.load_state_dict(lm_weights, strict=True)
+    _ = classifier.eval()
     
     preds, _ = classifier.predict(dataloaders, mode='inference')
+    
     # return to correct order
     preds = to_numpy(preds)[np.argsort(o)]
     

@@ -93,7 +93,7 @@ def dropout_mask(x, sz, dropout):
 
 
 class LockedDropout(nn.Module):
-    # From `fastai`
+    # From `fastai` and `salesforce/awd-lstm-lm`
     def __init__(self, p=0.5):
         super().__init__()
         self.p = p
@@ -102,13 +102,16 @@ class LockedDropout(nn.Module):
         if not self.training or not self.p:
             return x
         else:
-            mask = dropout_mask(x.data, (1, x.size(1), x.size(2)), self.p)
+            mask = dropout_mask(x.data, (1, x.shape[1], x.shape[2]), self.p)
             mask = Variable(mask, requires_grad=False)
             return mask * x
+    
+    def __repr__(self):
+        return 'LockedDropout(p=%f)' % self.p
 
 
 class WeightDrop(torch.nn.Module):
-    # From `fastai`
+    # From `fastai` and `salesforce/awd-lstm-lm`
     def __init__(self, module, dropout, weights=['weight_hh_l0']):
         super().__init__()
         self.module  = module
@@ -127,23 +130,27 @@ class WeightDrop(torch.nn.Module):
     def _setweights(self):
         for name_w in self.weights:
             raw_w = getattr(self.module, name_w + '_raw')
-            w = torch.nn.functional.dropout(raw_w, p=self.dropout, training=self.training)
+            w = F.dropout(raw_w, p=self.dropout, training=self.training)
             setattr(self.module, name_w, w)
             
     def forward(self, *args):
         self._setweights()
         return self.module.forward(*args)
+    
+    def __repr__(self):
+        return 'WeightDrop(%s)' % self.module.__repr__()
 
 
 class EmbeddingDropout(nn.Module):
-    # From `fastai`
+    # From `fastai` and `salesforce/awd-lstm-lm`
     def __init__(self, embed):
         super().__init__()
         self.embed = embed
         
     def forward(self, words, dropout=0.1, scale=None):
         if dropout:
-            mask = Variable(dropout_mask(self.embed.weight.data, (self.embed.weight.size(0), 1), dropout))
+            mask = dropout_mask(self.embed.weight.data, (self.embed.weight.size(0), 1), dropout)
+            mask = Variable(mask)
             masked_embed_weight = mask * self.embed.weight
         else:
             masked_embed_weight = self.embed.weight
@@ -160,11 +167,12 @@ class EmbeddingDropout(nn.Module):
         #         masked_embed_weight, padding_idx, self.embed.max_norm,
         #         self.embed.norm_type, self.embed.scale_grad_by_freq, self.embed.sparse)
         # else:
-        X = self.embed._backend.Embedding.apply(words,
+        return self.embed._backend.Embedding.apply(words,
             masked_embed_weight, padding_idx, self.embed.max_norm,
             self.embed.norm_type, self.embed.scale_grad_by_freq, self.embed.sparse)
-        
-        return X
+    
+    def __repr__(self):
+        return 'EmbeddingDropout(%s)' % self.embed.__repr__()
 
 
 class RNN_Encoder(nn.Module):
@@ -174,11 +182,17 @@ class RNN_Encoder(nn.Module):
         
         super().__init__()
         
-        self.ndir = 2 if bidir else 1
-        self.bs = 1
+        self.emb_sz     = emb_sz
+        self.nhid       = nhid
+        self.nlayers    = nlayers
+        self.dropoute   = dropoute
+        self.ndir       = 2 if bidir else 1
+        self.batch_size = 1
         
         self.encoder = nn.Embedding(n_tok, emb_sz, padding_idx=pad_token)
         self.encoder_with_dropout = EmbeddingDropout(self.encoder)
+        self.dropouti = LockedDropout(dropouti)
+        
         self.rnns = [
             nn.LSTM(
                 input_size=emb_sz if l == 0 else nhid, 
@@ -188,42 +202,32 @@ class RNN_Encoder(nn.Module):
                 dropout=dropouth
             ) for l in range(nlayers)
         ]
-        
-        if wdrop:
-            self.rnns = [WeightDrop(rnn, wdrop) for rnn in self.rnns]
-        
+        self.rnns = [WeightDrop(rnn, dropout=wdrop) for rnn in self.rnns]
         self.rnns = torch.nn.ModuleList(self.rnns)
-        self.encoder.weight.data.uniform_(-initrange, initrange)
-        
-        self.emb_sz    = emb_sz
-        self.nhid      = nhid
-        self.nlayers   = nlayers
-        self.dropoute  = dropoute
-        self.dropouti  = LockedDropout(dropouti)
         self.dropouths = nn.ModuleList([LockedDropout(dropouth) for l in range(nlayers)])
+        
+        self.encoder.weight.data.uniform_(-initrange, initrange)
     
     def one_hidden(self, l):
         nh = (self.nhid if l != self.nlayers - 1 else self.emb_sz) // self.ndir
-        return Variable(self.weights.new(self.ndir, self.bs, nh).zero_(), volatile=not self.training)
+        return Variable(self.weights.new(self.ndir, self.batch_size, nh).zero_(), volatile=not self.training)
         
     def reset(self):
         self.weights = next(self.parameters()).data
         self.hidden = [(self.one_hidden(l), self.one_hidden(l)) for l in range(self.nlayers)]
     
-    def forward(self, input):
-        
-        sl, bs = input.size()
-        if bs != self.bs:
-            self.bs = bs
+    def forward(self, x):
+        batch_size = x.shape[1]
+        if batch_size != self.batch_size:
+            self.batch_size = batch_size
             self.reset()
         
-        emb = self.encoder_with_dropout(input, dropout=self.dropoute if self.training else 0)
+        emb = self.encoder_with_dropout(x, dropout=self.dropoute if self.training else 0)
         emb = self.dropouti(emb)
         
         raw_output = emb
         new_hidden, raw_outputs, outputs = [], [], []
         for l, (rnn, drop) in enumerate(zip(self.rnns, self.dropouths)):
-            current_input = raw_output
             
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
@@ -333,13 +337,13 @@ class MultiBatchRNN(RNN_Encoder):
     def concat(self, arrs):
         return [torch.cat([l[si] for l in arrs]) for si in range(len(arrs[0]))]
         
-    def forward(self, input):
-        sl, _ = input.size()
+    def forward(self, x):
+        sl  = x.shape[0]
         _ = [[hh.data.zero_() for hh in h] for h in self.hidden]
         
         raw_outputs, outputs = [], []
         for i in range(0, sl, self.bptt):
-            raw_output, output = super().forward(input[i: min(i + self.bptt, sl)])
+            raw_output, output = super().forward(x[i: min(i + self.bptt, sl)])
             if i > (sl - self.max_seq):
                 raw_outputs.append(raw_output)
                 outputs.append(output)
@@ -347,85 +351,41 @@ class MultiBatchRNN(RNN_Encoder):
         return self.concat(raw_outputs), self.concat(outputs)
 
 
-class LinearBlock(nn.Module):
-    # From `fastai`
-    def __init__(self, ni, nf, drop):
-        super().__init__()
-        self.bn   = nn.BatchNorm1d(ni)
-        self.drop = nn.Dropout(drop)
-        self.lin  = nn.Linear(ni, nf)
-    
-    def forward(self, x):
-        return self.lin(self.drop(self.bn(x)))
-
-
 class PoolingLinearClassifier(nn.Module):
-    # From `fastai`
+    # Adapted from `fastai`
     def __init__(self, layers, drops, predict_only=False):
         super().__init__()
-        self.layers = nn.ModuleList([
-            LinearBlock(layers[i], layers[i + 1], drops[i]) for i in range(len(layers) - 1)])
         
         self.predict_only = predict_only
         
-    def pool(self, x, bs, is_max):
-        f = F.adaptive_max_pool1d if is_max else F.adaptive_avg_pool1d
-        return f(x.permute(1,2,0), (1,)).view(bs,-1)
+        self.layers = []
+        for i in range(len(layers) - 1):
+            self.layers += [
+                nn.BatchNorm1d(num_features=layers[i]),
+                nn.Dropout(p=drops[i]),
+                nn.Linear(in_features=layers[i], out_features=layers[i + 1]),
+                nn.ReLU(),
+            ]
+        
+        self.layers.pop() # Remove last relu
+        
+        self.layers = nn.Sequential(*self.layers)
         
     def forward(self, x):
         raw_outputs, outputs = x
-        output = outputs[-1]
         
-        bs = output.size()[1]
+        last_raw_output, last_output = raw_outputs[-1], outputs[-1]
+        
         x = torch.cat([
-            output[-1],
-            self.pool(output, bs, is_max=True), 
-            self.pool(output, bs, is_max=False),
+            last_output[-1],
+            last_output.max(dim=0)[0],
+            last_output.mean(dim=0)
         ], 1)
         
-        for l in self.layers:
-            l_x = l(x)
-            x = F.relu(l_x)
-        
         if self.predict_only:
-            return l_x
+            return self.layers(x)
         else:
-            return l_x, raw_outputs, outputs
-
-# Simpler version of above, but untested
-# class PoolingLinearClassifier(nn.Module):
-#     # From `fastai` -- needs testing
-#     def __init__(self, layers, drops):
-#         super().__init__()
-        
-#         self.layers = []
-#         for i in range(len(layers) - 1):
-#             self.layers += [
-#                 nn.BatchNorm1d(num_features=layers[i]),
-#                 nn.Dropout(p=drops[i]),
-#                 nn.Linear(in_features=layers[i], out_features=layers[i + 1]),
-#                 nn.ReLU(),
-#             ]
-        
-#         self.layers.pop() # Remove last relu
-        
-#         self.layers = nn.Sequential(*self.layers)
-    
-#     def pool(self, x, bs, is_max):
-#         pool_fn = F.adaptive_max_pool1d if is_max else F.adaptive_avg_pool1d
-#         return pool_fn(x.permute(1,2,0), (1,)).view(bs,-1)
-        
-#     def forward(self, x):
-#         raw_outputs, outputs = x
-#         output = outputs[-1]
-#         bs = output.size()[1]
-#         x = torch.cat([
-#             output[-1],
-#             self.pool(output, bs, is_max=True), 
-#             self.pool(output, bs, is_max=False),
-#         ], 1)
-            
-#         return self.layers(x), raw_outputs, outputs
+            return self.layers(x), last_raw_output, last_output
 
 
 class TextClassifier(BaseNet):
