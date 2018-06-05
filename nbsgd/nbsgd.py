@@ -113,7 +113,7 @@ r = np.column_stack([calc_r(i, X_train, y_train) for i in range(n_classes)])
 # --
 # Model definition
 
-def distill_loss_fn(x, ys, alpha=0.5, beta=1.0, T=1.5): # These could probably be tuned
+def distill_loss_fn(x, ys, distill_weight=2.0, T=1.5): # `distill_weight` and `T` could probably be tuned
     if len(ys.shape) == 1:
         return F.cross_entropy(x, ys.long())
     else:
@@ -130,7 +130,7 @@ def distill_loss_fn(x, ys, alpha=0.5, beta=1.0, T=1.5): # These could probably b
         hot_targets    = F.softmax(target_logits / T, dim=-1)
         soft_loss      = - (hot_targets * x_log_softmax).sum(dim=-1).mean()
         
-        return alpha * ce_loss + beta * soft_loss
+        return (x.shape[0] / labeled_sel.shape[0]) * ce_loss + distill_weight * soft_loss
 
 
 class DotProdNB(BaseNet):
@@ -194,3 +194,12 @@ for epoch in range(args.epochs):
         "time"      : time() - t,
     }))
     sys.stdout.flush()
+
+t = time()
+_ = model.predict(dataloaders, mode='train')
+print('gpu_predict_time', time() - t)
+
+t = time()
+_ = model.to('cpu')
+_ = model.predict(dataloaders, mode='train')
+print('cpu_predict_time', time() - t)

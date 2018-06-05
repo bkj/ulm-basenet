@@ -13,12 +13,12 @@ mkdir -p preds
 # --
 # Predict on training set + unlabeled set
 
-python inference.py \
+python ../inference.py \
     --lm-weights-path ../$RUN_PATH/classifier/weights/cl_final-epoch13.h5 \
     --X ../$RUN_PATH/classifier/train-X.npy \
     --outpath preds/classifier-train
 
-python inference.py \
+python ../inference.py \
     --lm-weights-path ../$RUN_PATH/classifier/weights/cl_final-epoch13.h5 \
     --X ../$RUN_PATH/lm/train-X.npy \
     --outpath nbsgd/preds/lm-train
@@ -28,4 +28,5 @@ python inference.py \
 
 cd nbsgd
 python prep.py --inpath ../$RUN_PATH
-python nbsgd.py 
+python nbsgd.py
+
