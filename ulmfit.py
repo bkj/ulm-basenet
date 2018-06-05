@@ -261,14 +261,14 @@ class LinearDecoder(nn.Module):
         self.dropout = LockedDropout(dropout)
     
     def forward(self, input):
-        raw_outputs, outputs = input
+        _, x = input
         
-        x = self.dropout(outputs[-1])
+        x = self.dropout(x[-1])
         x = x.view(x.size(0) * x.size(1), x.size(2))
         x = self.decoder(x)
         x = x.view(-1, x.size(1))
         
-        return x, raw_outputs, outputs
+        return x
 
 
 class LanguageModel(BaseNet):
@@ -276,7 +276,7 @@ class LanguageModel(BaseNet):
                  dropout=0.4, dropouth=0.3, dropouti=0.5, dropoute=0.1, wdrop=0.5, tie_weights=True):
         
         def _lm_loss_fn(output, target):
-            return F.cross_entropy(output[0], target)
+            return F.cross_entropy(output, target)
         
         super().__init__(loss_fn=_lm_loss_fn)
         
@@ -373,7 +373,6 @@ class PoolingLinearClassifier(nn.Module):
         
     def forward(self, x):
         raw_outputs, outputs = x
-        
         last_raw_output, last_output = raw_outputs[-1], outputs[-1]
         
         x = torch.cat([
