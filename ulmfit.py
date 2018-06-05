@@ -8,7 +8,7 @@
     !! Most of these functions are copied exactly/approximately from the `fastai` library.
         https://github.com/fastai/fastai
     
-    !! This hasn't been tested on torch>=0.4
+    !! This will not work on torch>=0.4, due to torch bugs
 """
 
 import re
@@ -16,6 +16,7 @@ import sys
 import json
 import warnings
 import numpy as np
+from time import time
 
 import torch
 from torch import nn
@@ -432,7 +433,6 @@ class TextClassifier(BaseNet):
 
 def basenet_train(model, dataloaders, num_epochs, lr_breaks, lr_vals, adam_betas, weight_decay=0, clip_grad_norm=0, 
     save_prefix=None):
-    """ Helper for training routine used in this script """
     
     params = [{
         "params" : parameters_from_children(lg, only_requires_grad=True),
@@ -450,6 +450,7 @@ def basenet_train(model, dataloaders, num_epochs, lr_breaks, lr_vals, adam_betas
     )
     
     fitist = []
+    t = time()
     for epoch in range(num_epochs):
         train = model.train_epoch(dataloaders, mode='train', compute_acc=False)
         valid = model.eval_epoch(dataloaders, mode='valid', compute_acc=True)
@@ -458,6 +459,7 @@ def basenet_train(model, dataloaders, num_epochs, lr_breaks, lr_vals, adam_betas
             "train_loss" : float(train['loss'][-1]),
             "valid_acc"  : float(valid['acc']),
             "valid_loss" : float(valid['loss'][-1]),
+            "elapsed"    : float(time() - t),
         })
         print(json.dumps(fitist[-1]))
         sys.stdout.flush()
