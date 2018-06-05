@@ -1,3 +1,5 @@
+nbsgd/data/*
+nbsgd/weights
 data/*
 models/*
 runs/*
