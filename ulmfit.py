@@ -431,8 +431,7 @@ class TextClassifier(BaseNet):
 # --
 # Basenet helper
 
-def basenet_train(model, dataloaders, num_epochs, lr_breaks, lr_vals, adam_betas, weight_decay=0, clip_grad_norm=0, 
-    save_prefix=None):
+def basenet_train(model, dataloaders, num_epochs, lr_breaks, lr_vals, adam_betas, weight_decay=0, clip_grad_norm=0,  save_prefix=None):
     
     params = [{
         "params" : parameters_from_children(lg, only_requires_grad=True),
@@ -452,8 +451,8 @@ def basenet_train(model, dataloaders, num_epochs, lr_breaks, lr_vals, adam_betas
     fitist = []
     t = time()
     for epoch in range(num_epochs):
-        train = model.train_epoch(dataloaders, mode='train', compute_acc=False)
-        valid = model.eval_epoch(dataloaders, mode='valid', compute_acc=True)
+        train = model.train_epoch(dataloaders, mode='train')
+        valid = model.eval_epoch(dataloaders, mode='valid', metric_fns=['n_correct'])
         fitist.append({
             "epoch"      : int(epoch),
             "train_loss" : float(train['loss'][-1]),

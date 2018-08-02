@@ -4,3 +4,5 @@ tqdm==4.23.4
 scikit-learn==0.19.1
 scipy==1.1.0
 h5py==2.7.1
+pathlib==1.0.1
+git+https://github.com/bkj/basenet.git@98783f9ba8b5237426922c54d57d836d95948134
