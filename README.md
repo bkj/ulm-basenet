@@ -28,4 +28,4 @@ See `./run.sh` for usage.
 #### Todo
 
 - Update to pytorch==0.4
- - !! Looked into this on 2018-12-02 -- pytorch==0.4 has a bug that doesn't allow freezing RNNs in the way we need to.  May need to wait for pytorch==1.0 for a fix, so I'm waiting for now.
+  - !! Looked into this on 2018-12-02 -- pytorch==0.4 has a bug that doesn't allow freezing RNNs in the way we need to.  May need to wait for pytorch==1.0 for a fix, so I'm waiting for now.
