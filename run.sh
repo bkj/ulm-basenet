@@ -3,8 +3,9 @@
 # --
 # Setup
 
-# Fetch data
 mkdir -p {data,models}
+
+# Fetch data
 wget http://ai.stanford.edu/~amaas/data/sentiment/aclImdb_v1.tar.gz
 tar -xzf aclImdb_v1.tar.gz && mv aclImdb data/aclImdb/
 rm aclImdb_v1.tar.gz
@@ -17,18 +18,17 @@ mv fwd_wt103.h5 itos_wt103.pkl models/wt103/
 # --
 # Run
 
-# RUN_PATH="runs/0"
-# MAX_VOCAB=30000
-
-RUN_PATH="runs/1"
-MAX_VOCAB=15000
+RUN_PATH="runs/run_0"
+MAX_VOCAB=15000 # increasing should increase runtime and improve accuracy
 
 # Train/test split (language model and classifier)
+# < 1 minute
 python make-splits.py \
     --inpath data/aclImdb \
     --outpath $RUN_PATH
 
 # Featurize datasets (language model and classifier)
+# ~ 1 minute
 python featurize.py \
     --inpath $RUN_PATH/lm/train.csv \
     --outpath $RUN_PATH/lm/train \

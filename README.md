@@ -11,10 +11,10 @@ conda create -n ulm_env python=3.6 pip -y
 source activate ulm_env
 
 # pytorch
-conda install pytorch pytorch=0.3.1 cuda90 -c pytorch -y
+conda install -c pytorch pytorch==0.4.1 -y
 
 # spacy (for tokenization)
-conda install -c conda-forge spacy -y
+conda install -c conda-forge spacy==2.0.18 -y
 python -m spacy download en
 
 # additional requirements
@@ -25,6 +25,13 @@ pip install -r requirements.txt
 
 See `./run.sh` for usage.
 
-#### Todo
+#### Debugging Notes
 
-- Update to pytorch==0.4 + test
+If you get an error like:
+```
+ValueError: 1792000 exceeds max_bin_len(1048576)
+```
+you can try [downgrading msgpack](https://github.com/explosion/spaCy/issues/2994):
+```
+msgpack==0.5.6
+```

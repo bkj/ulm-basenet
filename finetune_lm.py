@@ -15,7 +15,7 @@ import numpy as np
 from basenet.helpers import to_numpy, set_seeds, set_freeze
 from ulmfit import LanguageModelLoader, LanguageModel, basenet_train
 
-assert torch.__version__.split('.')[1] == '3', 'Downgrade to pytorch==0.3.2 (for now)'
+# assert torch.__version__.split('.')[1] == '3', 'Downgrade to pytorch==0.3.2 (for now)'
 
 # --
 # CLI

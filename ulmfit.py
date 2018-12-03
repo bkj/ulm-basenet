@@ -164,13 +164,13 @@ class EmbeddingDropout(nn.Module):
             padding_idx = -1
         
         # if IS_TORCH_04:
-        #     X = F.embedding(words,
-        #         masked_embed_weight, padding_idx, self.embed.max_norm,
-        #         self.embed.norm_type, self.embed.scale_grad_by_freq, self.embed.sparse)
-        # else:
-        return self.embed._backend.Embedding.apply(words,
+        return F.embedding(words,
             masked_embed_weight, padding_idx, self.embed.max_norm,
             self.embed.norm_type, self.embed.scale_grad_by_freq, self.embed.sparse)
+        # else:
+        # return self.embed._backend.Embedding.apply(words,
+        #     masked_embed_weight, padding_idx, self.embed.max_norm,
+        #     self.embed.norm_type, self.embed.scale_grad_by_freq, self.embed.sparse)
     
     def __repr__(self):
         return 'EmbeddingDropout(%s)' % self.embed.__repr__()
