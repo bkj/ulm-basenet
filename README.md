@@ -1,4 +1,4 @@
-### basenet-ulmfit
+### ulm-basenet
 
 Implementation of [ulmfit](https://github.com/fastai/fastai/tree/master/courses/dl2/imdb_scripts) using [basenet](https://github.com/bkj/basenet) wrappers.
 
