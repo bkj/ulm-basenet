@@ -25,6 +25,7 @@ def get_texts(path):
         for fname in glob(os.path.join(path, label, '*.*')):
             yield open(fname, 'r').read(), label
 
+
 if __name__ == "__main__":
     args = parse_args()
     np.random.seed(args.seed)

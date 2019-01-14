@@ -411,9 +411,14 @@ class TextClassifier(BaseNet):
         )
         
         self.decoder = PoolingLinearClassifier(head_layers, head_drops, predict_only=predict_only)
-    
+        
+        self.use_decoder = True
+        
     def forward(self, x):
         x = self.encoder(x)
+        if not self.use_decoder:
+            return x[1][-1]
+        
         x = self.decoder(x)
         return x
     

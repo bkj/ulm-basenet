@@ -47,11 +47,11 @@ if __name__ == "__main__":
     # Params
     
     bptt, emb_sz, n_hid, n_layers, batch_size = 70, 400, 1150, 3, 48
-    dps       = np.array([0.4, 0.5, 0.05, 0.3, 0.1])
-    lr        = 3e-3
-    lrm       = 2.6
-    lrs       = np.array([lr / (lrm ** i) for i in range(5)[::-1]])
-    max_seq   = 20 * 70
+    dps = np.array([0.4, 0.5, 0.05, 0.3, 0.1])
+    lr  = 3e-3
+    lrm = 2.6
+    lrs = np.array([lr / (lrm ** i) for i in range(5)[::-1]])
+    max_seq = 20 * 70
     pad_token = 1
     
     args = parse_args()
