@@ -451,13 +451,14 @@ def basenet_train(model, dataloaders, num_epochs, lr_breaks, lr_vals, adam_betas
     fitist = []
     t = time()
     for epoch in range(num_epochs):
-        train = model.train_epoch(dataloaders, mode='train')
+        train = model.train_epoch(dataloaders, mode='train', metric_fns=['n_correct'])
         valid = model.eval_epoch(dataloaders, mode='valid', metric_fns=['n_correct'])
         fitist.append({
             "epoch"      : int(epoch),
-            "train_loss" : float(train['loss'][-1]),
+            "train_acc"  : float(train['acc']),
             "valid_acc"  : float(valid['acc']),
-            "valid_loss" : float(valid['loss'][-1]),
+            "train_loss" : float(np.mean(train['loss'][-10:])),
+            "valid_loss" : float(np.mean(valid['loss'])),
             "elapsed"    : float(time() - t),
         })
         print(json.dumps(fitist[-1]))

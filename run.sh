@@ -20,7 +20,7 @@ mv fwd_wt103.h5 itos_wt103.pkl models/wt103/
 # RUN_PATH="runs/0"
 # MAX_VOCAB=30000
 
-RUN_PATH="runs/1"
+RUN_PATH="runs/2"
 MAX_VOCAB=15000
 
 # Train/test split (language model and classifier)
@@ -65,14 +65,30 @@ python finetune_lm.py \
     --X-valid $RUN_PATH/lm/valid-X.npy | tee $RUN_PATH/lm.jl
 
 # Train classifier
-python train_classifier.py \
-    --lm-weights-path $RUN_PATH/lm/weights/lm_ft_final-epoch14.h5 \
+CUDA_VISIBLE_DEVICES=7 python train_classifier.py \
+    --lm-weights-path $RUN_PATH/lm/weights/lm_ft_final-epoch7.h5 \
     --outpath $RUN_PATH/classifier/weights \
     --X-train $RUN_PATH/classifier/train-X.npy \
     --X-valid $RUN_PATH/classifier/valid-X.npy \
     --y-train $RUN_PATH/classifier/train-y.npy \
     --y-valid $RUN_PATH/classifier/valid-y.npy | tee $RUN_PATH/classifier.jl
 
+# >>
+
+TRAIN_SIZES=(100 200 400 800 1600 3200 6400 12800)
+for TRAIN_SIZE in ${TRAIN_SIZES[*]}; do
+    echo $TRAIN_SIZE
+    CUDA_VISIBLE_DEVICES=7 python train_classifier.py \
+        --train-size $TRAIN_SIZE \
+        --lm-weights-path $RUN_PATH/lm/weights/lm_ft_final-epoch9.h5 \
+        --outpath $RUN_PATH/classifier/weights \
+        --X-train $RUN_PATH/classifier/train-X.npy \
+        --X-valid $RUN_PATH/classifier/valid-X.npy \
+        --y-train $RUN_PATH/classifier/train-y.npy \
+        --y-valid $RUN_PATH/classifier/valid-y.npy | tee $RUN_PATH/classifier-$TRAIN_SIZE.jl
+done
+
+# <<
 
 # Perform inference
 mkdir -p $RUN_PATH/classifier/preds/

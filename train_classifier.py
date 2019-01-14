@@ -34,6 +34,9 @@ def parse_args():
     parser.add_argument('--X-valid', type=str)
     parser.add_argument('--y-valid', type=str)
     parser.add_argument('--seed', type=int, default=123)
+    
+    parser.add_argument('--train-size', type=int, default=None)
+    
     return parser.parse_args()
 
 # --
@@ -44,11 +47,11 @@ if __name__ == "__main__":
     # Params
     
     bptt, emb_sz, n_hid, n_layers, batch_size = 70, 400, 1150, 3, 48
-    dps = np.array([0.4, 0.5, 0.05, 0.3, 0.1])
-    lr  = 3e-3
-    lrm = 2.6
-    lrs = np.array([lr / (lrm ** i) for i in range(5)[::-1]])
-    max_seq = 20 * 70
+    dps       = np.array([0.4, 0.5, 0.05, 0.3, 0.1])
+    lr        = 3e-3
+    lrm       = 2.6
+    lrs       = np.array([lr / (lrm ** i) for i in range(5)[::-1]])
+    max_seq   = 20 * 70
     pad_token = 1
     
     args = parse_args()
@@ -61,6 +64,11 @@ if __name__ == "__main__":
     
     X_train = np.load(args.X_train)
     y_train = np.load(args.y_train).squeeze()
+    
+    if args.train_size:
+        print('subset training data to %d records' % args.train_size, file=sys.stderr)
+        train_sel = np.random.choice(X_train.shape[0], args.train_size, replace=False)
+        X_train, y_train = X_train[train_sel], y_train[train_sel]
     
     X_valid = np.load(args.X_valid)
     y_valid = np.load(args.y_valid).squeeze()
