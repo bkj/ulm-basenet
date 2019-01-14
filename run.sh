@@ -20,7 +20,7 @@ mv fwd_wt103.h5 itos_wt103.pkl models/wt103/
 # RUN_PATH="runs/0"
 # MAX_VOCAB=30000
 
-RUN_PATH="runs/2"
+RUN_PATH="runs/tok_test"
 MAX_VOCAB=15000
 
 # Train/test split (language model and classifier)

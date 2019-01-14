@@ -44,16 +44,13 @@ def parse_args():
     
     return parser.parse_args()
 
-
 # --
 # Helpers
 
-def load_data(df_path, doc_path):
-    train_sel = pd.read_csv(df_path, sep='\t', usecols=['lm_train'])
-    train_sel = train_sel.values.squeeze()
-    
-    tmp = np.load(doc_path)
-    return tmp[train_sel], tmp[~train_sel]
+def load_lm_docs(df_path, doc_path):
+    train_sel = pd.read_csv(df_path, sep='\t', usecols=['lm_train']).values.squeeze()
+    docs = np.load(doc_path)
+    return docs[train_sel], docs[~train_sel]
 
 
 def load_lm_weights(lm_weights_path, lm_vocab_path, str2id_path):
@@ -91,7 +88,17 @@ set_seeds(args.seed)
 os.makedirs(args.outpath, exist_ok=True)
 
 # --
-# Load model
+# Load data
+
+X_train, X_valid = load_lm_docs(args.df_path, args.doc_path)
+
+dataloaders = {
+    "train" : LanguageModelLoader(np.concatenate(X_train), bs=bs, bptt=bptt),
+    "valid" : LanguageModelLoader(np.concatenate(X_valid), bs=bs, bptt=bptt),
+}
+
+# --
+# Define model
 
 print('finetune_lm.py: loading LM weights', file=sys.stderr)
 lm_weights, n_tok = load_lm_weights(
@@ -100,7 +107,7 @@ lm_weights, n_tok = load_lm_weights(
     str2id_path=args.str2id_path,
 )
 
-language_model = LanguageModel(
+model = LanguageModel(
     n_tok     = n_tok, 
     emb_sz    = emb_sz,
     nhid      = nhid, 
@@ -113,28 +120,19 @@ language_model = LanguageModel(
     dropouth  = drops[4],
 ).to('cuda')
 
-language_model.verbose = True
-language_model.load_weights(lm_weights)
-set_freeze(language_model, False)
-_ = language_model.train()
-
-# --
-# Load data
-
-X_train, X_valid = load_data(args.df_path, args.doc_path)
-
-dataloaders = {
-    "train" : LanguageModelLoader(np.concatenate(X_train), bs=bs, bptt=bptt),
-    "valid" : LanguageModelLoader(np.concatenate(X_valid), bs=bs, bptt=bptt),
-}
+model.verbose = True
+model.load_weights(lm_weights)
+set_freeze(model, False)
+_ = model.train()
+torch.save(model.state_dict(), os.path.join(args.outpath, 'lm_orig.h5'))
 
 # --
 # Finetune decoder
 
-set_freeze(language_model.encoder.rnns, True)
-set_freeze(language_model.encoder.dropouths, True)
+set_freeze(model.encoder.rnns, True)
+set_freeze(model.encoder.dropouths, True)
 lm_ft_last = basenet_train(
-    language_model,
+    model,
     dataloaders,
     num_epochs=1,
     lr_breaks=[0, 0.5, 1],
@@ -147,9 +145,9 @@ lm_ft_last = basenet_train(
 # --
 # Finetune end-to-end
 
-set_freeze(language_model.encoder, False)
+set_freeze(model.encoder, False)
 lm_ft_all = basenet_train(
-    language_model,
+    model,
     dataloaders,
     num_epochs=15,
     lr_breaks=[0, 15 / 10, 15],

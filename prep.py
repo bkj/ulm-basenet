@@ -18,10 +18,10 @@ def join_columns(df, cols, begin_tok='xbos', field_tok='xfld'):
     
     return text
 
-def prep_ag(df):
+def prep_ag(df, cl_train):
     df.columns     = ('label', 'headline', 'body')
     df['text']     = join_columns(df, ['headline', 'body'])
-    df['cl_train'] = True
+    df['cl_train'] = cl_train
     df['lm_train'] = np.random.uniform(0, 1, df.shape[0]) < 0.9
     del df['headline']
     del df['body']
@@ -44,8 +44,8 @@ train_df = pd.read_csv(train_path, header=None)
 valid_df = pd.read_csv(valid_path, header=None)
 
 if dataset == 'ag':
-    train_df = prep_ag(train_df)
-    valid_df = prep_ag(valid_df)
+    train_df = prep_ag(train_df, cl_train=True)
+    valid_df = prep_ag(valid_df, cl_train=False)
 else:
     raise Exception
 
