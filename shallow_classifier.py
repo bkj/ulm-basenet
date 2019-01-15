@@ -145,8 +145,16 @@ model.use_decoder = False
 train_feats = extract_features(model, dataloaders, mode='train')
 valid_feats = extract_features(model, dataloaders, mode='valid')
 
+# --
+# Train shallow model
 
+from sklearn.svm import LinearSVC
 
+train_sel = np.random.choice(train_feats.shape[0], 100, replace=False)
+model     = LinearSVC().fit(train_feats[train_sel], y_train[train_sel])
+
+pred_valid = model.predict(valid_feats)
+(y_valid == pred_valid).mean()
 
 
 
