@@ -299,10 +299,13 @@ class LanguageModel(BaseNet):
             dropout=dropout,
             decoder_weights=self.encoder.encoder if tie_weights else None
         )
+        
+        self.use_decoder = True
     
     def forward(self, x):
         x = self.encoder(x)
-        x = self.decoder(x)
+        if self.use_decoder:
+            x = self.decoder(x)
         return x
     
     def get_layer_groups(self):

@@ -10,6 +10,7 @@
 
 import re
 import spacy
+import numpy as np
 from spacy.symbols import ORTH
 from concurrent.futures import ProcessPoolExecutor
 
@@ -54,11 +55,12 @@ class Tokenizer():
         return self.spacy_tok(s)
 
     @staticmethod
-    def proc_all(ss, lang):
+    def proc_all(docs, lang):
         tok = Tokenizer(lang)
-        return [tok.proc_text(s) for s in ss]
-
+        return [tok.proc_text(doc) for doc in docs]
+    
     @staticmethod
-    def proc_all_mp(ss, lang='en', ncpus=32):
-        with ProcessPoolExecutor(ncpus) as e:
-            return sum(e.map(Tokenizer.proc_all, ss, [lang] * len(ss)), [])
+    def proc_all_mp(docs, n_jobs=32, lang='en'):
+        chunked_docs = np.array_split(docs, n_jobs)
+        with ProcessPoolExecutor(n_jobs) as e:
+            return sum(e.map(Tokenizer.proc_all, chunked_docs, [lang] * len(chunked_docs)), [])
