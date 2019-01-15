@@ -57,7 +57,12 @@ if __name__ == "__main__":
     os.makedirs(args.outdir, exist_ok=True)
     
     print('reading %s' % args.inpath, file=sys.stderr)
-    df = pd.read_csv(args.inpath, sep='\t')
+    if '.tsv' in args.inpath:
+        df = pd.read_csv(args.inpath, sep='\t')
+    elif '.feather' in args.inpath:
+        df = pd.read_feather(args.inpath)
+    else:
+        raise Exception
     
     # --
     # Tokenize

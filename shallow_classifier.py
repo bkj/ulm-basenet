@@ -148,13 +148,70 @@ valid_feats = extract_features(model, dataloaders, mode='valid')
 # --
 # Train shallow model
 
+from rsub import *
+from matplotlib import pyplot as plt
 from sklearn.svm import LinearSVC
+from sklearn.feature_extraction.text import TfidfVectorizer
 
-train_sel = np.random.choice(train_feats.shape[0], 100, replace=False)
-model     = LinearSVC().fit(train_feats[train_sel], y_train[train_sel])
+X_train_str = [' '.join([str(xxx) for xxx in xx]) for xx in X_train]
+X_valid_str = [' '.join([str(xxx) for xxx in xx]) for xx in X_valid]
 
-pred_valid = model.predict(valid_feats)
-(y_valid == pred_valid).mean()
+accs = []
+train_sizes = [10, 20, 40, 80, 100, 200, 400, 800, 1600, 3200, 6400]
+for train_size in train_sizes:
+    
+    
+    train_sel = np.random.choice(train_feats.shape[0], train_size, replace=False)
+    
+    # --
+    # ulm
+    
+    model      = LinearSVC(C=1).fit(train_feats[train_sel], y_train[train_sel])
+    pred_valid = model.predict(valid_feats)
+    acc_ulm_1  = (y_valid == pred_valid).mean()
+    
+    model      = LinearSVC(C=0.1).fit(train_feats[train_sel], y_train[train_sel])
+    pred_valid = model.predict(valid_feats)
+    acc_ulm_01  = (y_valid == pred_valid).mean()
+    
+    model      = LinearSVC(C=0.001).fit(train_feats[train_sel], y_train[train_sel])
+    pred_valid = model.predict(valid_feats)
+    acc_ulm_001  = (y_valid == pred_valid).mean()
+    
+    # --
+    # bow
+    
+    vect     = TfidfVectorizer()
+    Xv_train = vect.fit_transform(np.array(X_train_str)[train_sel])
+    Xv_valid = vect.transform(X_valid_str)
+    
+    model      = LinearSVC().fit(Xv_train, y_train[train_sel])
+    pred_valid = model.predict(Xv_valid)
+    acc_bow    = (y_valid == pred_valid).mean()
+    
+    accs.append({
+        "train_size" : train_size,
+        "ulm_1"      : acc_ulm_1,
+        "ulm_01"     : acc_ulm_01,
+        "ulm_001"    : acc_ulm_001,
+        "bow"        : acc_bow,
+    })
+    print(accs[-1])
+
+accs = pd.DataFrame(accs)
+
+_ = plt.plot(train_sizes, accs.ulm_1, marker='o')
+_ = plt.plot(train_sizes, accs.ulm_01, marker='o')
+_ = plt.plot(train_sizes, accs.ulm_001, marker='o')
+_ = plt.plot(train_sizes, accs.bow, marker='+')
+_ = plt.xscale('log')
+show_plot()
+
+# --
+# Train BOW model
+
+
+
 
 
 
