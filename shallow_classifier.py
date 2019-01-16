@@ -54,12 +54,16 @@ def load_cl_docs(df_path, doc_path, do_sort=True):
     
     if do_sort:
         train_ord = np.argsort([-len(x) for x in X_train])
-        X_train, y_train = X_train[train_ord], y_train[train_ord]
-        
         valid_ord = np.argsort([-len(x) for x in X_valid])
-        X_valid, y_valid = X_valid[valid_ord], y_valid[valid_ord]
+    else:
+        train_ord = np.random.permutation(X_train.shape[0])
+        valid_ord = np.random.permutation(X_valid.shape[0])
+    
+    X_train, y_train = X_train[train_ord], y_train[train_ord]
+    X_valid, y_valid = X_valid[valid_ord], y_valid[valid_ord]
     
     return X_train, X_valid, y_train, y_valid
+
 
 def extract_features(model, dataloaders, mode='train'):
     all_feats, all_targets = [], []
@@ -97,6 +101,7 @@ set_seeds(args.seed)
 X_train, X_valid, y_train, y_valid = load_cl_docs(
     df_path=args.df_path, 
     doc_path=os.path.join(args.rundir, 'id_docs.npy'),
+    do_sort=False,
 )
 
 dataloaders = {
@@ -160,7 +165,6 @@ accs = []
 train_sizes = [10, 20, 40, 80, 100, 200, 400, 800, 1600, 3200, 6400]
 for train_size in train_sizes:
     
-    
     train_sel = np.random.choice(train_feats.shape[0], train_size, replace=False)
     
     # --
@@ -209,9 +213,3 @@ show_plot()
 
 # --
 # Train BOW model
-
-
-
-
-
-
