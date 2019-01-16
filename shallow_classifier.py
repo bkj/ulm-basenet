@@ -68,6 +68,7 @@ def load_cl_docs(df_path, doc_path, do_sort=True):
 def extract_features(model, dataloaders, mode='train'):
     all_feats, all_targets = [], []
     for x, _ in tqdm(dataloaders[mode], total=len(dataloaders[mode])):
+        model.reset() # !! Not sure if this is correct.  May make more of a difference for twitter.
         last_output = model.encoder(x.cuda())[1][-1]
         feat = torch.cat([
             last_output[-1],
