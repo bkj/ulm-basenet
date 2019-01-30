@@ -36,15 +36,9 @@ def parse_args():
     parser = argparse.ArgumentParser()
     
     parser.add_argument('--dataset', type=str, default='ag', choices=['ag'])
-    
-    parser.add_argument('--train-path', type=str,
-            default=os.path.expanduser('~/data/fasttext/ag_news_csv/train.csv'))
-    
-    parser.add_argument('--valid-path', type=str,
-            default=os.path.expanduser('~/data/fasttext/ag_news_csv/test.csv'))
-    
+    parser.add_argument('--train-path', type=str)
+    parser.add_argument('--valid-path', type=str)
     parser.add_argument('--outpath', type=str, default='./data/ag.tsv')
-    
     parser.add_argument('--seed', type=int, default=123)
     
     return parser.parse_args()

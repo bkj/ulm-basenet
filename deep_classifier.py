@@ -1,27 +1,30 @@
 #!/usr/bin/env python
 
 """
-    train_classifier.py
+    shallow_classifier.py
 """
+
+import argparse
 
 import os
 import sys
-import json
 import torch
-import argparse
 import numpy as np
 import pandas as pd
+from tqdm import tqdm
 from functools import partial
 
-import torch
 from torch.nn import functional as F
 from torch.utils.data import DataLoader
-from torch.utils.data.sampler import SequentialSampler
 
-from basenet.helpers import set_seeds, set_freeze
-from basenet.text.data import RaggedDataset, SortishSampler, text_collate_fn
-
+from basenet.text.data import RaggedDataset, text_collate_fn
+from basenet.helpers import to_numpy, set_seeds, set_freeze
 from ulmfit import TextClassifier, basenet_train
+
+assert torch.__version__.split('.')[1] == '3', 'Downgrade to pytorch==0.3.2 (for now)'
+
+# --
+# Params
 
 bptt, emb_sz, n_hid, n_layers, batch_size = 70, 400, 1150, 3, 48
 dps = np.array([0.4, 0.5, 0.05, 0.3, 0.1])
@@ -32,81 +35,73 @@ max_seq = 20 * 70
 pad_token = 1
 
 # --
+# Helpers
+
+def load_cl_docs(df_path, doc_path, do_sort=True):
+    tmp = pd.read_csv(df_path, sep='\t', 
+        usecols=['cl_train', 'label'],
+        dtype={
+            'cl_train' : bool,
+            'label'    : int,
+        }
+    )
+    
+    train_sel = tmp.cl_train.values
+    label     = tmp.label.values
+    
+    docs = np.load(doc_path)
+    X_train, X_valid = docs[train_sel], docs[~train_sel]
+    y_train, y_valid = label[train_sel], label[~train_sel]
+    
+    if do_sort:
+        train_ord = np.argsort([-len(x) for x in X_train])
+        valid_ord = np.argsort([-len(x) for x in X_valid])
+    else:
+        train_ord = np.random.permutation(X_train.shape[0])
+        valid_ord = np.random.permutation(X_valid.shape[0])
+    
+    X_train, y_train = X_train[train_ord], y_train[train_ord]
+    X_valid, y_valid = X_valid[valid_ord], y_valid[valid_ord]
+    
+    return X_train, X_valid, y_train, y_valid
+
+
+# --
 # CLI
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--lm-weights-path', type=str, default='results/ag/lm_ft_final-epoch0.h5')
-    
-    parser.add_argument('--df-path',  type=str, default='data/ag.tsv')
-    parser.add_argument('--doc-path', type=str, default='results/ag.id.npy')
-    parser.add_argument('--outpath',  type=str, default='results/ag/')
-    
+    parser.add_argument('--lm-weights-path', type=str, default='results/ag/lm_ft_final-epoch14.h5')
+    parser.add_argument('--df-path', type=str, default='data/ag_news.tsv')
+    parser.add_argument('--rundir',  type=str, default='results/ag2/')
     parser.add_argument('--seed', type=int, default=123)
-    
-    parser.add_argument('--train-size', type=int, default=500)
-    parser.add_argument('--valid-size', type=int, default=None)
-    
     return parser.parse_args()
 
-
-# --
-# Params
 
 args = parse_args()
 set_seeds(args.seed)
 
-os.makedirs(args.outpath, exist_ok=True)
-
 # --
 # IO
 
-docs = np.load(args.doc_path)
-train_sel, label = pd.read_csv(args.df_path, sep='\t', usecols=['cl_train', 'label']).values.T
-train_sel = train_sel.astype(bool)
-
-X_train, X_valid = docs[train_sel], docs[~train_sel]
-y_train, y_valid = label[train_sel], label[~train_sel]
-
-if args.train_size:
-    print('subset training data to %d records' % args.train_size, file=sys.stderr)
-    train_sel = np.random.choice(X_train.shape[0], args.train_size, replace=False)
-    X_train, y_train = X_train[train_sel], y_train[train_sel]
-
-if args.valid_size:
-    print('subset valid data to %d records' % args.valid_size, file=sys.stderr)
-    valid_sel = np.random.choice(X_valid.shape[0], args.valid_size, replace=False)
-    X_valid, y_valid = X_valid[valid_sel], y_valid[valid_sel]
-
-
-# Map labels to sequential ints
-ulabs   = np.unique(y_train)
-n_class = len(ulabs)
-
-lab_lookup = dict(zip(ulabs, range(len(ulabs))))
-y_train    = np.array([lab_lookup[l] for l in y_train])
-y_valid    = np.array([lab_lookup[l] for l in y_valid])
-
-# Sort validation data by length, longest to shortest, for efficiency
-o = np.argsort([len(x) for x in X_valid])[::-1]
-X_valid, y_valid = X_valid[o], y_valid[o]
+X_train, X_valid, y_train, y_valid = load_cl_docs(
+    df_path=args.df_path, 
+    doc_path=os.path.join(args.rundir, 'id_docs.npy'),
+    do_sort=True,
+)
 
 dataloaders = {
     "train" : DataLoader(
         dataset=RaggedDataset(X_train, y_train),
-        sampler=SortishSampler(X_train, batch_size=batch_size//2),
-        batch_size=batch_size//2,
         collate_fn=text_collate_fn,
-        num_workers=1,
-        pin_memory=True,
+        shuffle=False,
+        batch_size=batch_size,
     ),
     "valid" : DataLoader(
         dataset=RaggedDataset(X_valid, y_valid),
-        sampler=SequentialSampler(X_valid),
-        batch_size=batch_size,
         collate_fn=text_collate_fn,
-        num_workers=1,
-        pin_memory=True,
+        shuffle=False,
+        batch_size=batch_size,
     )
 }
 
@@ -135,7 +130,9 @@ def text_classifier_loss_fn(x, target, alpha=0, beta=0):
 
 
 lm_weights = torch.load(args.lm_weights_path)
-n_tok = lm_weights['encoder.encoder.weight'].shape[0]
+
+n_tok   = lm_weights['encoder.encoder.weight'].shape[0]
+n_class = len(set(y_train))
 
 model = TextClassifier(
     bptt        = bptt,
@@ -167,8 +164,8 @@ for k in weights_to_drop:
 model.load_state_dict(lm_weights, strict=False)
 set_freeze(model, False)
 
-# # --
-# # Train
+# --
+# Train
 
 # Finetune decoder
 set_freeze(model.encoder.encoder, True)
@@ -177,7 +174,7 @@ set_freeze(model.encoder.rnns, True)
 set_freeze(model.encoder.dropouths, True)
 
 class_ft_dec = basenet_train(
-    classifier,
+    model,
     dataloaders,
     num_epochs=1,
     lr_breaks=[0, 1/3, 1],
@@ -185,14 +182,14 @@ class_ft_dec = basenet_train(
     adam_betas=(0.7, 0.99),
     weight_decay=0,
     clip_grad_norm=25,
-    save_prefix=os.path.join(args.outpath, 'cl_ft_last1'),
+    save_prefix=os.path.join(args.rundir, 'cl_ft_last1'),
 )
 
 # Finetune last layer
-set_freeze(classifier.encoder.rnns[-1], False)
-set_freeze(classifier.encoder.dropouths[-1], False)
+set_freeze(model.encoder.rnns[-1], False)
+set_freeze(model.encoder.dropouths[-1], False)
 class_ft_last = basenet_train(
-    classifier,
+    model,
     dataloaders,
     num_epochs=1,
     lr_breaks=[0, 1/3, 1],
@@ -200,13 +197,13 @@ class_ft_last = basenet_train(
     adam_betas=(0.7, 0.99),
     weight_decay=0,
     clip_grad_norm=25,
-    save_prefix=os.path.join(args.outpath, 'cl_ft_last2'),
+    save_prefix=os.path.join(args.rundir, 'cl_ft_last2'),
 )
 
 # Finetune end-to-end
-set_freeze(classifier, False)
+set_freeze(model, False)
 class_ft_all = basenet_train(
-    classifier,
+    model,
     dataloaders,
     num_epochs=14,
     lr_breaks=[0, 14/10, 14],
@@ -214,6 +211,6 @@ class_ft_all = basenet_train(
     adam_betas=(0.7, 0.99),
     weight_decay=0,
     clip_grad_norm=25,
-    save_prefix=os.path.join(args.outpath, 'cl_final'),
+    save_prefix=os.path.join(args.rundir, 'cl_final'),
 )
 

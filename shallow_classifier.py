@@ -87,9 +87,7 @@ def parse_args():
     parser.add_argument('--lm-weights-path', type=str, default='results/ag/lm_ft_final-epoch13.h5')
     parser.add_argument('--df-path', type=str, default='data/ag.tsv')
     parser.add_argument('--rundir',  type=str, default='results/ag2/')
-    
     parser.add_argument('--seed', type=int, default=123)
-    
     return parser.parse_args()
 
 

@@ -3,32 +3,24 @@
 # --
 # AG news
 
-# Convert dataset to appropriate format
-
 python prep.py \
     --dataset ag \
     --train-path $HOME/data/fasttext/ag_news_csv/train.csv \
     --valid-path $HOME/data/fasttext/ag_news_csv/test.csv \
-    --outpath ./data/ag2.tsv
+    --outpath ./data/ag_news.tsv
 
 python featurize.py \
-    --inpath ./data/ag2.tsv \
-    --outdir ./results/ag2
+    --inpath ./data/ag_news.tsv \
+    --outdir ./results/ag_news
 
-python finetune_lm.py \
-    --df-path data/ag2.tsv \
-    --rundir results/ag2
+CUDA_VISIBLE_DEVICES=6 python finetune_lm.py \
+    --df-path data/ag_news.tsv \
+    --rundir results/ag_news
 
-# step through this
-# python shallow_classifier.py \
-#     --lm-weights-path results/ag/lm_ft_final-epoch13.h5 \
-#     --df-path data/ag2.tsv
+python shallow_classifier.py \
+    --lm-weights-path results/ag/lm_ft_final-epoch14.h5 \
+    --df-path data/ag_news.tsv
 
-# --
-
-function pluck_english {
-    cat | jq -c 'if(.lang == "en") then {text} else null end //empty' | fgrep "#"
-}
-export -f pluck_english
-
-cat jon.jl | parallel -N 100000 --pipe pluck_english | gzip -c > jon-en.jl.gz
+# python deep_classifier.py \
+#     --lm-weights-path results/ag/lm_ft_final-epoch14.h5 \
+#     --df-path data/ag_news.tsv
