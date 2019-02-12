@@ -34,12 +34,9 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--lm-weights-path', type=str, default='models/wt103/fwd_wt103.h5')
     parser.add_argument('--lm-vocab-path', type=str, default='models/wt103/itos_wt103.pkl')
-    
     parser.add_argument('--df-path',     type=str, default='data/ag.tsv')
     parser.add_argument('--rundir',      type=str, default='results/ag2/')
-    
     parser.add_argument('--seed', type=int, default=123)
-    
     return parser.parse_args()
 
 # --
@@ -123,6 +120,7 @@ model = LanguageModel(
 ).to('cuda')
 
 model.verbose = True
+print('!! loading weights', file=sys.stderr)
 model.load_weights(lm_weights)
 set_freeze(model, False)
 _ = model.train()

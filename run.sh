@@ -18,9 +18,9 @@ CUDA_VISIBLE_DEVICES=6 python finetune_lm.py \
     --rundir results/ag_news
 
 python shallow_classifier.py \
-    --lm-weights-path results/ag/lm_ft_final-epoch14.h5 \
+    --lm-weights-path results/ag_news/lm_weights/lm_ft_final-epoch14.h5 \
     --df-path data/ag_news.tsv
 
-# python deep_classifier.py \
-#     --lm-weights-path results/ag/lm_ft_final-epoch14.h5 \
-#     --df-path data/ag_news.tsv
+python deep_classifier.py \
+    --lm-weights-path results/ag_news/lm_ft_final-epoch14.h5 \
+    --df-path data/ag_news.tsv

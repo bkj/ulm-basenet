@@ -19,7 +19,9 @@ from torch.utils.data import DataLoader
 
 from basenet.text.data import RaggedDataset, text_collate_fn
 from basenet.helpers import to_numpy, set_seeds, set_freeze
+
 from ulmfit import TextClassifier, basenet_train
+from helpers import load_cl_docs
 
 assert torch.__version__.split('.')[1] == '3', 'Downgrade to pytorch==0.3.2 (for now)'
 
@@ -35,45 +37,13 @@ max_seq = 20 * 70
 pad_token = 1
 
 # --
-# Helpers
-
-def load_cl_docs(df_path, doc_path, do_sort=True):
-    tmp = pd.read_csv(df_path, sep='\t', 
-        usecols=['cl_train', 'label'],
-        dtype={
-            'cl_train' : bool,
-            'label'    : int,
-        }
-    )
-    
-    train_sel = tmp.cl_train.values
-    label     = tmp.label.values
-    
-    docs = np.load(doc_path)
-    X_train, X_valid = docs[train_sel], docs[~train_sel]
-    y_train, y_valid = label[train_sel], label[~train_sel]
-    
-    if do_sort:
-        train_ord = np.argsort([-len(x) for x in X_train])
-        valid_ord = np.argsort([-len(x) for x in X_valid])
-    else:
-        train_ord = np.random.permutation(X_train.shape[0])
-        valid_ord = np.random.permutation(X_valid.shape[0])
-    
-    X_train, y_train = X_train[train_ord], y_train[train_ord]
-    X_valid, y_valid = X_valid[valid_ord], y_valid[valid_ord]
-    
-    return X_train, X_valid, y_train, y_valid
-
-
-# --
 # CLI
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--lm-weights-path', type=str, default='results/ag/lm_ft_final-epoch14.h5')
+    parser.add_argument('--lm-weights-path', type=str, default='results/ag_news/lm_weights/lm_ft_final-epoch14.h5')
     parser.add_argument('--df-path', type=str, default='data/ag_news.tsv')
-    parser.add_argument('--rundir',  type=str, default='results/ag2/')
+    parser.add_argument('--rundir',  type=str, default='results/ag_news/')
     parser.add_argument('--seed', type=int, default=123)
     return parser.parse_args()
 
@@ -87,14 +57,14 @@ set_seeds(args.seed)
 X_train, X_valid, y_train, y_valid = load_cl_docs(
     df_path=args.df_path, 
     doc_path=os.path.join(args.rundir, 'id_docs.npy'),
-    do_sort=True,
+    do_sort=False,
 )
 
 dataloaders = {
     "train" : DataLoader(
         dataset=RaggedDataset(X_train, y_train),
         collate_fn=text_collate_fn,
-        shuffle=False,
+        shuffle=True,
         batch_size=batch_size,
     ),
     "valid" : DataLoader(

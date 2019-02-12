@@ -24,7 +24,9 @@ from torch.utils.data import DataLoader
 
 from basenet.text.data import RaggedDataset, text_collate_fn
 from basenet.helpers import to_numpy, set_seeds, set_freeze
+
 from ulmfit import LanguageModel
+from helpers import load_cl_docs, extract_features
 
 assert torch.__version__.split('.')[1] == '3', 'Downgrade to pytorch==0.3.2 (for now)'
 
@@ -41,52 +43,6 @@ drops   = np.array([0.25, 0.1, 0.2, 0.02, 0.15]) * 0.7
 # wd      = 1e-7
 
 batch_size = 32
-
-# --
-# Helpers
-
-def load_cl_docs(df_path, doc_path, do_sort=True):
-    tmp = pd.read_csv(df_path, sep='\t', 
-        usecols=['cl_train', 'label'],
-        dtype={
-            'cl_train' : bool,
-            'label'    : int,
-        }
-    )
-    
-    train_sel = tmp.cl_train.values
-    label     = tmp.label.values
-    
-    docs = np.load(doc_path)
-    X_train, X_valid = docs[train_sel], docs[~train_sel]
-    y_train, y_valid = label[train_sel], label[~train_sel]
-    
-    if do_sort:
-        train_ord = np.argsort([-len(x) for x in X_train])
-        valid_ord = np.argsort([-len(x) for x in X_valid])
-    else:
-        train_ord = np.random.permutation(X_train.shape[0])
-        valid_ord = np.random.permutation(X_valid.shape[0])
-    
-    X_train, y_train = X_train[train_ord], y_train[train_ord]
-    X_valid, y_valid = X_valid[valid_ord], y_valid[valid_ord]
-    
-    return X_train, X_valid, y_train, y_valid
-
-
-def extract_features(model, dataloaders, mode='train'):
-    all_feats, all_targets = [], []
-    for x, _ in tqdm(dataloaders[mode], total=len(dataloaders[mode])):
-        model.reset() # !! Not sure if this is correct.  May make more of a difference for twitter.
-        last_output = model.encoder(x.cuda())[1][-1]
-        feat = torch.cat([
-            last_output[-1],
-            last_output.max(dim=0)[0],
-            last_output.mean(dim=0)
-        ], 1)
-        all_feats.append(to_numpy(feat))
-        
-    return np.vstack(all_feats)
 
 # --
 # CLI
